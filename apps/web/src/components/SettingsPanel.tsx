@@ -1,10 +1,22 @@
 import { useState } from 'react';
 import { TAG_COLORS } from '@guoguo/shared';
 import { api } from '../api';
-import { useApp } from '../appContext';
+import { remainingUnlockLabel, useApp } from '../appContext';
 
 export function SettingsPanel() {
-  const { me, profiles, profileId, setProfileId, refreshMe, setMe } = useApp();
+  const {
+    me,
+    profiles,
+    profileId,
+    setProfileId,
+    refreshMe,
+    setMe,
+    hasPin,
+    parentUnlocked,
+    unlockUntil,
+    lockParent,
+    openPinModal,
+  } = useApp();
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>(TAG_COLORS[1]);
   const [error, setError] = useState('');
@@ -50,6 +62,39 @@ export function SettingsPanel() {
 
   return (
     <div>
+      <div className="panel">
+        <h3>家长 PIN 锁</h3>
+        <p style={{ margin: '0 0 12px', color: 'var(--ink-muted)', fontWeight: 700, fontSize: '0.9rem' }}>
+          {hasPin
+            ? parentUnlocked
+              ? `已解锁，约 ${remainingUnlockLabel(unlockUntil)} 后自动锁定`
+              : '已锁定 · 打卡与兑奖需输入 PIN'
+            : '尚未设置 · 建议立刻设置，防止小朋友乱加豆豆'}
+        </p>
+        <div className="form-inline">
+          {!hasPin ? (
+            <button type="button" className="btn btn-primary" onClick={() => openPinModal('setup')}>
+              设置 PIN
+            </button>
+          ) : (
+            <>
+              {parentUnlocked ? (
+                <button type="button" className="btn btn-ghost" onClick={() => lockParent()}>
+                  立即锁定
+                </button>
+              ) : (
+                <button type="button" className="btn btn-primary" onClick={() => openPinModal('unlock')}>
+                  解锁
+                </button>
+              )}
+              <button type="button" className="btn btn-ghost" onClick={() => openPinModal('change')}>
+                修改 PIN
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
       <div className="panel">
         <h3>家庭账号</h3>
         <p style={{ margin: '0 0 8px', color: 'var(--ink-muted)', fontWeight: 700 }}>

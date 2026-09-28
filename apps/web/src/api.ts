@@ -9,6 +9,16 @@ import type {
   RedemptionDto,
 } from '@guoguo/shared';
 
+export class ApiError extends Error {
+  code?: string;
+  status: number;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     credentials: 'include',
@@ -20,16 +30,24 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error((data as { error?: string }).error ?? `请求失败 (${res.status})`);
+    const body = data as { error?: string; code?: string };
+    throw new ApiError(body.error ?? `请求失败 (${res.status})`, res.status, body.code);
   }
   return data as T;
 }
+
+export type PinStatus = {
+  hasPin: boolean;
+  unlocked: boolean;
+  expiresAt: string | null;
+};
 
 export type MeResponse = {
   user: { id: string; email: string; name: string };
   familyId: string;
   familyName: string;
   profiles: ProfileDto[];
+  pin?: PinStatus;
 };
 
 export const api = {
@@ -50,6 +68,22 @@ export const api = {
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
 
   me: () => request<MeResponse>('/api/auth/me'),
+
+  pin: {
+    status: () => request<PinStatus>('/api/auth/pin/status'),
+    setup: (body: { pin: string; oldPin?: string }) =>
+      request<PinStatus & { ok: boolean }>('/api/auth/pin/setup', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    unlock: (pin: string) =>
+      request<PinStatus & { ok: boolean }>('/api/auth/pin/unlock', {
+        method: 'POST',
+        body: JSON.stringify({ pin }),
+      }),
+    lock: () =>
+      request<{ ok: boolean; unlocked: boolean }>('/api/auth/pin/lock', { method: 'POST' }),
+  },
 
   profiles: {
     list: () => request<ProfileDto[]>('/api/profiles'),

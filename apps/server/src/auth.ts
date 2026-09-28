@@ -120,5 +120,10 @@ export function setParentCookie(reply: FastifyReply, app: FastifyInstance, userI
 }
 
 export function clearParentCookie(reply: FastifyReply) {
-  reply.clearCookie('parentToken', { path: '/' });
+  reply.clearCookie('parentToken', {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: false,
+  });
 }

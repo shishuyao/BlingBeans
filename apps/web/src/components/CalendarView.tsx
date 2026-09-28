@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { BehaviorTagDto, CheckInDto } from '@guoguo/shared';
-import { api } from '../api';
+import { ApiError, api } from '../api';
 import { useApp } from '../appContext';
 import { playCheckInSound } from '../sound';
 import { MonthCalendar } from './MonthCalendar';
 import { DayCheckInSheet } from './DayCheckInSheet';
 
 export function CalendarView() {
-  const { profileId, month, setBeans, enqueueMerges } = useApp();
+  const { profileId, month, setBeans, enqueueMerges, hasPin, parentUnlocked, ensureParent } = useApp();
   const [checkIns, setCheckIns] = useState<CheckInDto[]>([]);
   const [tags, setTags] = useState<BehaviorTagDto[]>([]);
   const [sheetDate, setSheetDate] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  const locked = hasPin && !parentUnlocked;
 
   const reload = useCallback(async () => {
     if (!profileId) return;
@@ -30,6 +32,8 @@ export function CalendarView() {
 
   const onAdd = async (tagId: string) => {
     if (!profileId || !sheetDate) return;
+    const ok = await ensureParent();
+    if (!ok) return;
     setBusy(true);
     setError('');
     try {
@@ -39,6 +43,10 @@ export function CalendarView() {
       else playCheckInSound();
       await reload();
     } catch (e) {
+      if (e instanceof ApiError && e.code === 'PARENT_LOCK') {
+        const unlocked = await ensureParent();
+        if (unlocked) return onAdd(tagId);
+      }
       setError(e instanceof Error ? e.message : '打卡失败');
     } finally {
       setBusy(false);
@@ -47,6 +55,8 @@ export function CalendarView() {
 
   const onRemove = async (tagId: string) => {
     if (!profileId || !sheetDate) return;
+    const ok = await ensureParent();
+    if (!ok) return;
     setBusy(true);
     setError('');
     try {
@@ -72,6 +82,10 @@ export function CalendarView() {
           onClose={() => setSheetDate(null)}
           onAdd={onAdd}
           onRemove={onRemove}
+          locked={locked}
+          onUnlock={async () => {
+            await ensureParent();
+          }}
           busy={busy}
         />
       ) : null}

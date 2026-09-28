@@ -95,12 +95,149 @@ img {
   letter-spacing: 0.02em;
 }
 
+.brand-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 70%;
+}
+
 .profile-switch {
   display: flex;
   gap: 6px;
   overflow-x: auto;
-  max-width: 55%;
+  max-width: 100%;
   padding-bottom: 2px;
+}
+
+.lock-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 1.15rem;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+
+.lock-btn.unlocked {
+  background: #e8f5e9;
+}
+
+.kid-mode-banner,
+.parent-mode-banner {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.kid-mode-banner {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.parent-mode-banner {
+  background: #e8f5e9;
+  color: var(--brand-dark);
+}
+
+.lock-hint {
+  background: #fff3e0;
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.lock-hint p {
+  margin: 0 0 10px;
+  font-weight: 700;
+  color: #e65100;
+}
+
+/* PIN pad */
+.pin-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(31, 42, 36, 0.55);
+}
+
+.pin-card {
+  width: min(360px, 100%);
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 22px 18px 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+}
+
+.pin-card h3 {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+}
+
+.pin-sub {
+  text-align: center;
+  color: var(--ink-muted);
+  font-weight: 700;
+  font-size: 0.88rem;
+  margin: 6px 0 16px;
+}
+
+.pin-dots {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.pin-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--brand);
+  background: transparent;
+}
+
+.pin-dot.filled {
+  background: var(--brand);
+}
+
+.pin-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.pin-key {
+  min-height: 56px;
+  border-radius: 16px;
+  background: var(--bg);
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.pin-key:active:not(:disabled) {
+  background: #d8f3dc;
+  transform: scale(0.97);
+}
+
+.pin-key.empty {
+  visibility: hidden;
+}
+
+.pin-key.back {
+  font-size: 1.1rem;
 }
 
 .profile-chip {

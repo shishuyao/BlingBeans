@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { BeanBalanceDto, MergeEvent, ProfileDto } from '@guoguo/shared';
-import { api, type MeResponse } from './api';
+import { api, type MeResponse, type PinStatus } from './api';
 import {
   AppContext,
   type AppView,
+  type PinModalMode,
   currentMonth,
+  remainingUnlockLabel,
   todayStr,
 } from './appContext';
 import { AuthPage } from './components/AuthPage';
@@ -12,6 +14,7 @@ import { BeanProgressBar } from './components/BeanProgressBar';
 import { BottomNav } from './components/BottomNav';
 import { CalendarView } from './components/CalendarView';
 import { MergeCelebration } from './components/MergeCelebration';
+import { PinGate } from './components/PinGate';
 import { RewardsPanel } from './components/RewardsPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { SummaryPanel } from './components/SummaryPanel';
@@ -27,10 +30,28 @@ export function App() {
     () => localStorage.getItem(PROFILE_KEY)
   );
   const [beans, setBeans] = useState<BeanBalanceDto | null>(null);
-  const [view, setView] = useState<AppView>('calendar');
+  const [view, setViewState] = useState<AppView>('calendar');
   const [month, setMonth] = useState(currentMonth());
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [mergeQueue, setMergeQueue] = useState<MergeEvent[]>([]);
+  const [hasPin, setHasPin] = useState(false);
+  const [parentUnlocked, setParentUnlocked] = useState(true);
+  const [unlockUntil, setUnlockUntil] = useState<string | null>(null);
+  const [pinModal, setPinModal] = useState<PinModalMode | null>(null);
+  const [nowTick, setNowTick] = useState(0);
+  const pinResolver = useRef<((ok: boolean) => void) | null>(null);
+
+  const applyPinStatus = useCallback((pin?: PinStatus) => {
+    if (!pin) {
+      setHasPin(false);
+      setParentUnlocked(true);
+      setUnlockUntil(null);
+      return;
+    }
+    setHasPin(pin.hasPin);
+    setParentUnlocked(pin.unlocked);
+    setUnlockUntil(pin.expiresAt);
+  }, []);
 
   const setProfileId = useCallback((id: string) => {
     localStorage.setItem(PROFILE_KEY, id);
@@ -41,10 +62,16 @@ export function App() {
     const data = await api.me();
     setMe(data);
     setProfiles(data.profiles);
+    applyPinStatus(data.pin);
     const saved = localStorage.getItem(PROFILE_KEY);
     const valid = data.profiles.find((p) => p.id === saved) ?? data.profiles[0];
     if (valid) setProfileId(valid.id);
-  }, [setProfileId]);
+  }, [setProfileId, applyPinStatus]);
+
+  const refreshPinStatus = useCallback(async () => {
+    const status = await api.pin.status();
+    applyPinStatus(status);
+  }, [applyPinStatus]);
 
   const refreshBeans = useCallback(async () => {
     if (!profileId) {
@@ -55,24 +82,103 @@ export function App() {
     setBeans(b);
   }, [profileId]);
 
+  const closePinModal = useCallback((ok = false) => {
+    setPinModal(null);
+    const resolve = pinResolver.current;
+    pinResolver.current = null;
+    resolve?.(ok);
+  }, []);
+
+  const openPinModal = useCallback((mode: PinModalMode) => {
+    setPinModal(mode);
+  }, []);
+
+  const ensureParent = useCallback(async () => {
+    try {
+      const status = await api.pin.status();
+      applyPinStatus(status);
+      if (status.hasPin && status.unlocked) return true;
+
+      const mode: PinModalMode = status.hasPin ? 'unlock' : 'setup';
+      return await new Promise<boolean>((resolve) => {
+        pinResolver.current = async (ok) => {
+          if (ok) {
+            try {
+              await api.pin.status().then(applyPinStatus);
+            } catch {
+              applyPinStatus({ hasPin: true, unlocked: true, expiresAt: null });
+            }
+          }
+          resolve(ok);
+        };
+        setPinModal(mode);
+      });
+    } catch {
+      return false;
+    }
+  }, [applyPinStatus]);
+
+  const lockParent = useCallback(async () => {
+    await api.pin.lock();
+    setParentUnlocked(false);
+    setUnlockUntil(null);
+    if (view === 'tags' || view === 'rewards' || view === 'settings') {
+      setViewState('calendar');
+    }
+  }, [view]);
+
+  const setView = useCallback(
+    async (next: AppView) => {
+      const needsParent = next === 'tags' || next === 'rewards' || next === 'settings';
+      if (needsParent) {
+        const ok = await ensureParent();
+        if (!ok) return;
+      }
+      setViewState(next);
+    },
+    [ensureParent]
+  );
+
   useEffect(() => {
     api
       .me()
       .then((data) => {
         setMe(data);
         setProfiles(data.profiles);
+        applyPinStatus(data.pin);
         const saved = localStorage.getItem(PROFILE_KEY);
         const valid = data.profiles.find((p) => p.id === saved) ?? data.profiles[0];
         if (valid) setProfileId(valid.id);
       })
       .catch(() => setMe(null))
       .finally(() => setBooting(false));
-  }, [setProfileId]);
+  }, [setProfileId, applyPinStatus]);
 
   useEffect(() => {
     if (!profileId || !me) return;
     refreshBeans().catch(() => setBeans(null));
   }, [profileId, me, refreshBeans]);
+
+  // Auto-lock when unlock expires
+  useEffect(() => {
+    if (!hasPin || !parentUnlocked || !unlockUntil) return;
+    const ms = new Date(unlockUntil).getTime() - Date.now();
+    if (ms <= 0) {
+      setParentUnlocked(false);
+      setUnlockUntil(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      setParentUnlocked(false);
+      setUnlockUntil(null);
+      setViewState((v) => (v === 'tags' || v === 'rewards' || v === 'settings' ? 'calendar' : v));
+    }, ms + 200);
+    const tick = setInterval(() => setNowTick((n) => n + 1), 30000);
+    return () => {
+      clearTimeout(t);
+      clearInterval(tick);
+    };
+  }, [hasPin, parentUnlocked, unlockUntil]);
 
   const enqueueMerges = useCallback((events: MergeEvent[]) => {
     if (!events.length) return;
@@ -82,6 +188,20 @@ export function App() {
   const shiftMerge = useCallback(() => {
     setMergeQueue((q) => q.slice(1));
   }, []);
+
+  const onPinDone = useCallback(
+    async (ok: boolean) => {
+      if (ok) {
+        try {
+          await refreshPinStatus();
+        } catch {
+          /* ignore */
+        }
+      }
+      closePinModal(ok);
+    },
+    [closePinModal, refreshPinStatus]
+  );
 
   const ctx = useMemo(
     () => ({
@@ -93,6 +213,10 @@ export function App() {
       month,
       selectedDate,
       mergeQueue,
+      hasPin,
+      parentUnlocked,
+      unlockUntil,
+      pinModal,
       setMe,
       setProfileId,
       setProfiles,
@@ -104,6 +228,11 @@ export function App() {
       shiftMerge,
       refreshBeans,
       refreshMe,
+      refreshPinStatus,
+      ensureParent,
+      lockParent,
+      openPinModal,
+      closePinModal,
     }),
     [
       me,
@@ -114,11 +243,22 @@ export function App() {
       month,
       selectedDate,
       mergeQueue,
+      hasPin,
+      parentUnlocked,
+      unlockUntil,
+      pinModal,
       setProfileId,
+      setView,
       enqueueMerges,
       shiftMerge,
       refreshBeans,
       refreshMe,
+      refreshPinStatus,
+      ensureParent,
+      lockParent,
+      openPinModal,
+      closePinModal,
+      nowTick,
     ]
   );
 
@@ -139,21 +279,55 @@ export function App() {
           <header className="top-bar">
             <div className="brand-row">
               <div className="brand">果果豆豆</div>
-              <div className="profile-switch">
-                {profiles.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={`profile-chip${p.id === profileId ? ' active' : ''}`}
-                    style={p.id === profileId ? { borderColor: p.avatarColor } : undefined}
-                    onClick={() => setProfileId(p.id)}
-                  >
-                    {p.name}
-                  </button>
-                ))}
+              <div className="brand-actions">
+                <button
+                  type="button"
+                  className={`lock-btn${parentUnlocked && hasPin ? ' unlocked' : ''}`}
+                  title={
+                    !hasPin
+                      ? '未设置家长 PIN'
+                      : parentUnlocked
+                        ? `已解锁 · 剩余 ${remainingUnlockLabel(unlockUntil)}`
+                        : '已锁定 · 点击解锁'
+                  }
+                  onClick={async () => {
+                    if (!hasPin) {
+                      openPinModal('setup');
+                      return;
+                    }
+                    if (parentUnlocked) {
+                      await lockParent();
+                    } else {
+                      await ensureParent();
+                    }
+                  }}
+                >
+                  {!hasPin ? '🔑' : parentUnlocked ? '🔓' : '🔒'}
+                </button>
+                <div className="profile-switch">
+                  {profiles.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`profile-chip${p.id === profileId ? ' active' : ''}`}
+                      style={p.id === profileId ? { borderColor: p.avatarColor } : undefined}
+                      onClick={() => setProfileId(p.id)}
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <BeanProgressBar />
+            {hasPin && !parentUnlocked ? (
+              <div className="kid-mode-banner">孩子模式 · 打卡/兑奖需家长解锁</div>
+            ) : null}
+            {hasPin && parentUnlocked ? (
+              <div className="parent-mode-banner">
+                家长已解锁 · 约 {remainingUnlockLabel(unlockUntil)}后自动锁定
+              </div>
+            ) : null}
           </header>
 
           <main>
@@ -166,6 +340,7 @@ export function App() {
 
           <BottomNav />
           <MergeCelebration />
+          {pinModal ? <PinGate mode={pinModal} onDone={onPinDone} /> : null}
         </div>
       )}
     </AppContext.Provider>
