@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime       @default(now())
+  memberships  FamilyMember[]
+}
+
+model Family {
+  id        String         @id @default(cuid())
+  name      String
+  pinHash   String?
+  createdAt DateTime       @default(now())
+  members   FamilyMember[]
+  profiles  Profile[]
+}
+
+model FamilyMember {
+  id       String @id @default(cuid())
+  userId   String
+  familyId String
+  role     String @default("owner")
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  family   Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, familyId])
+}
+
+model Profile {
+  id          String        @id @default(cuid())
+  familyId    String
+  name        String
+  avatarColor String        @default("#4CAF50")
+  sortOrder   Int           @default(0)
+  createdAt   DateTime      @default(now())
+  family      Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  tags        BehaviorTag[]
+  checkIns    CheckIn[]
+  rewards     Reward[]
+  redemptions Redemption[]
+  balance     BeanBalance?
+  beanSlots   BeanSlot[]
+}
+
+model BehaviorTag {
+  id              String    @id @default(cuid())
+  profileId       String
+  name            String
+  color           String
+  beansOnComplete Int       @default(1)
+  sortOrder       Int       @default(0)
+  active          Boolean   @default(true)
+  profile         Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  checkIns        CheckIn[]
+  beanSlots       BeanSlot[]
+}
+
+model CheckIn {
+  id        String      @id @default(cuid())
+  profileId String
+  tagId     String
+  date      String
+  count     Int         @default(1)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  profile   Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  tag       BehaviorTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, tagId, date])
+  @@index([profileId, date])
+}
+
+model BeanBalance {
+  id         String  @id @default(cuid())
+  profileId  String  @unique
+  smallBeans Int     @default(0)
+  bigBeans   Int     @default(0)
+  profile    Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+/// Tracks the color of each unmerged small bean (FIFO queue for progress bar)
+model BeanSlot {
+  id        String       @id @default(cuid())
+  profileId String
+  tagId     String?
+  color     String
+  createdAt DateTime     @default(now())
+  profile   Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  tag       BehaviorTag? @relation(fields: [tagId], references: [id], onDelete: SetNull)
+
+  @@index([profileId, createdAt])
+}
+
+model Reward {
+  id          String       @id @default(cuid())
+  profileId   String
+  title       String
+  costSmall   Int          @default(0)
+  costBig     Int          @default(0)
+  photoUrl    String?
+  active      Boolean      @default(true)
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+  profile     Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  redemptions Redemption[]
+}
+
+model Redemption {
+  id         String   @id @default(cuid())
+  profileId  String
+  rewardId   String
+  costSmall  Int
+  costBig    Int
+  redeemedAt DateTime @default(now())
+  profile    Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  reward     Reward   @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, redeemedAt])
+}

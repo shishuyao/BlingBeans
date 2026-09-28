@@ -1,0 +1,16 @@
+{
+  "name": "guoguo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @guoguo/server & npm run dev -w @guoguo/web",
+    "dev:server": "npm run dev -w @guoguo/server",
+    "dev:web": "npm run dev -w @guoguo/web",
+    "build": "npm run build -w @guoguo/shared && npm run build -w @guoguo/server && npm run build -w @guoguo/web",
+    "db:push": "npm run db:push -w @guoguo/server",
+    "db:seed": "npm run db:seed -w @guoguo/server"
+  }
+}

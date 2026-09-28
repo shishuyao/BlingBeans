@@ -1,0 +1,144 @@
+export const SMALL_PER_BIG = 10;
+
+export const DEFAULT_TAGS = [
+  { name: '0投诉', color: '#4CAF50', beansOnComplete: 1 },
+  { name: '注意力集中20分钟以上', color: '#2196F3', beansOnComplete: 2 },
+  { name: '礼貌交友', color: '#FF9800', beansOnComplete: 1 },
+  { name: '逻辑清晰', color: '#9C27B0', beansOnComplete: 2 },
+] as const;
+
+export const TAG_COLORS = [
+  '#4CAF50',
+  '#2196F3',
+  '#FF9800',
+  '#9C27B0',
+  '#E91E63',
+  '#00BCD4',
+  '#FF5722',
+  '#795548',
+  '#607D8B',
+  '#FFC107',
+] as const;
+
+export type BehaviorTagDto = {
+  id: string;
+  profileId: string;
+  name: string;
+  color: string;
+  beansOnComplete: number;
+  sortOrder: number;
+  active: boolean;
+};
+
+export type CheckInDto = {
+  id: string;
+  profileId: string;
+  tagId: string;
+  date: string;
+  count: number;
+  tag?: BehaviorTagDto;
+};
+
+export type BeanBalanceDto = {
+  smallBeans: number;
+  bigBeans: number;
+  /** Colors filling the current 10-slot progress (left to right) */
+  slotColors: string[];
+};
+
+export type MergeEvent = {
+  fromSmall: number;
+  toBig: number;
+  colors: string[];
+};
+
+export type RewardDto = {
+  id: string;
+  profileId: string;
+  title: string;
+  costSmall: number;
+  costBig: number;
+  photoUrl: string | null;
+  active: boolean;
+  sortOrder: number;
+};
+
+export type RedemptionDto = {
+  id: string;
+  rewardId: string;
+  redeemedAt: string;
+  costSmall: number;
+  costBig: number;
+  reward?: RewardDto;
+};
+
+export type ProfileDto = {
+  id: string;
+  familyId: string;
+  name: string;
+  avatarColor: string;
+  sortOrder: number;
+};
+
+export type MonthSummaryDto = {
+  month: string;
+  checkIns: CheckInDto[];
+  redemptions: RedemptionDto[];
+  totalSmallEarned: number;
+  totalBigEarned: number;
+  tagStats: Array<{ tagId: string; name: string; color: string; count: number }>;
+};
+
+/** Convert total small beans into big + remainder small */
+export function normalizeBeans(small: number, big: number): { smallBeans: number; bigBeans: number; merges: number } {
+  const totalSmall = small + big * SMALL_PER_BIG;
+  const bigBeans = Math.floor(totalSmall / SMALL_PER_BIG);
+  const smallBeans = totalSmall % SMALL_PER_BIG;
+  const merges = bigBeans - big;
+  return { smallBeans, bigBeans, merges: Math.max(0, merges) };
+}
+
+/** Can afford cost given balance (1 big = 10 small) */
+export function canAfford(
+  balance: { smallBeans: number; bigBeans: number },
+  cost: { costSmall: number; costBig: number }
+): boolean {
+  const have = balance.smallBeans + balance.bigBeans * SMALL_PER_BIG;
+  const need = cost.costSmall + cost.costBig * SMALL_PER_BIG;
+  return have >= need;
+}
+
+/** Deduct cost, preferring exact denomination then converting big→small as needed */
+export function deductBeans(
+  balance: { smallBeans: number; bigBeans: number },
+  cost: { costSmall: number; costBig: number }
+): { smallBeans: number; bigBeans: number } | null {
+  if (!canAfford(balance, cost)) return null;
+  let small = balance.smallBeans;
+  let big = balance.bigBeans;
+
+  // Pay big beans first when possible
+  let needBig = cost.costBig;
+  let needSmall = cost.costSmall;
+
+  if (big >= needBig) {
+    big -= needBig;
+    needBig = 0;
+  } else {
+    needSmall += (needBig - big) * SMALL_PER_BIG;
+    big = 0;
+    needBig = 0;
+  }
+
+  if (small >= needSmall) {
+    small -= needSmall;
+  } else {
+    const deficit = needSmall - small;
+    const convert = Math.ceil(deficit / SMALL_PER_BIG);
+    if (big < convert) return null;
+    big -= convert;
+    small = small + convert * SMALL_PER_BIG - needSmall;
+  }
+
+  return { smallBeans: small, bigBeans: big };
+}
