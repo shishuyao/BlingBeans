@@ -2,16 +2,19 @@ import { useEffect, useState } from 'react';
 import type { MonthSummaryDto } from '@guoguo/shared';
 import { api } from '../api';
 import { monthLabel, shiftMonth, useApp } from '../appContext';
+import { RedeemDetailSheet, RedeemTimeline } from './RedeemTimeline';
 
 export function SummaryPanel() {
   const { profileId, month, setMonth } = useApp();
   const [data, setData] = useState<MonthSummaryDto | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [albumOpen, setAlbumOpen] = useState<number | null>(null);
 
   useEffect(() => {
     if (!profileId) return;
     setLoading(true);
+    setAlbumOpen(null);
     api
       .summary(profileId, month)
       .then(setData)
@@ -64,35 +67,40 @@ export function SummaryPanel() {
             )}
           </div>
 
+          <RedeemTimeline redemptions={data.redemptions} emptyHint="本月还没有兑换奖励" />
+
           <div className="panel">
             <h3>兑奖相册</h3>
             {data.redemptions.length === 0 ? (
               <p className="empty-hint">本月还没有兑换奖励</p>
             ) : (
               <div className="redeem-wall">
-                {data.redemptions.map((r) => (
-                  <div key={r.id} className="redeem-tile">
+                {data.redemptions.map((r, i) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    className="redeem-tile"
+                    onClick={() => setAlbumOpen(i)}
+                  >
                     {r.reward?.photoUrl ? (
                       <img src={r.reward.photoUrl} alt={r.reward.title} />
                     ) : (
-                      <div
-                        style={{
-                          height: '100%',
-                          display: 'grid',
-                          placeItems: 'center',
-                          fontSize: '1.6rem',
-                          background: '#e8e0d0',
-                        }}
-                      >
-                        🎁
-                      </div>
+                      <div className="redeem-tile-empty">🎁</div>
                     )}
                     <div className="cap">{r.reward?.title ?? '奖励'}</div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
           </div>
+          {albumOpen != null && data.redemptions[albumOpen] ? (
+            <RedeemDetailSheet
+              items={data.redemptions}
+              index={albumOpen}
+              onIndex={setAlbumOpen}
+              onClose={() => setAlbumOpen(null)}
+            />
+          ) : null}
         </>
       )}
     </div>

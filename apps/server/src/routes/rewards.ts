@@ -2,8 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { authenticate, assertProfileAccess, requireParent } from '../auth.js';
-import { deductCost, getOrCreateBalance, getSlotColors } from '../beans.js';
-import { canAfford } from '@guoguo/shared';
+import { deductCost, getOrCreateBalance, toBeanDto } from '../beans.js';
+import { appendBeanLedger } from '../ledger.js';
+import { shanghaiToday } from '../dates.js';
+import { canAfford, SMALL_PER_BIG } from '@guoguo/shared';
 
 export async function rewardRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate);
@@ -52,6 +54,22 @@ export async function rewardRoutes(app: FastifyInstance) {
     return reply.status(201).send(reward);
   });
 
+  app.get('/history', async (request, reply) => {
+    const query = z.object({ profileId: z.string() }).parse(request.query);
+    const profile = await assertProfileAccess(request.user.id, query.profileId);
+    if (!profile) return reply.status(404).send({ error: '档案不存在' });
+
+    const rows = await prisma.redemption.findMany({
+      where: { profileId: query.profileId },
+      include: { reward: true },
+      orderBy: { redeemedAt: 'desc' },
+    });
+    return rows.map((r) => ({
+      ...r,
+      redeemedAt: r.redeemedAt.toISOString(),
+    }));
+  });
+
   app.patch('/:id', { preHandler: requireParent }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = z
@@ -92,6 +110,14 @@ export async function rewardRoutes(app: FastifyInstance) {
     const profile = await assertProfileAccess(request.user.id, reward.profileId);
     if (!profile) return reply.status(404).send({ error: '奖励不存在' });
 
+    const locked = await prisma.profile.findUniqueOrThrow({
+      where: { id: reward.profileId },
+      select: { dangerLocked: true },
+    });
+    if (locked.dangerLocked) {
+      return reply.status(400).send({ error: '危险模式中，先打卡攒够豆再兑奖', code: 'DANGER_LOCK' });
+    }
+
     const balance = await getOrCreateBalance(reward.profileId);
     if (!canAfford(balance, reward)) {
       return reply.status(400).send({ error: '豆豆不足' });
@@ -111,10 +137,17 @@ export async function rewardRoutes(app: FastifyInstance) {
       },
       include: { reward: true },
     });
+    await appendBeanLedger({
+      profileId: reward.profileId,
+      amount: -(reward.costSmall + reward.costBig * SMALL_PER_BIG),
+      reason: 'redeem',
+      date: shanghaiToday(),
+      redemptionId: redemption.id,
+    });
 
     return {
       redemption,
-      beans: beanResult,
+      beans: await toBeanDto(reward.profileId),
     };
   });
 }

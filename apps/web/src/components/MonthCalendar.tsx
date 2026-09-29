@@ -1,4 +1,4 @@
-import type { CheckInDto } from '@guoguo/shared';
+import type { DayQuestDto } from '@guoguo/shared';
 import {
   daysInMonth,
   firstWeekday,
@@ -11,11 +11,25 @@ import {
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 
 type Props = {
-  checkIns: CheckInDto[];
+  quests: DayQuestDto[];
   onSelectDay: (date: string) => void;
 };
 
-export function MonthCalendar({ checkIns, onSelectDay }: Props) {
+function footer(opts: { mystery: boolean; isFuture: boolean; quest?: DayQuestDto }) {
+  if (opts.isFuture) return '还没到';
+  if (opts.mystery) return '待开';
+  const q = opts.quest;
+  if (!q) return '';
+  if (q.kind === 'happy') {
+    return q.beansEarned > 0 ? `${q.beansEarned}豆` : '';
+  }
+  if (q.settled) {
+    return q.beansEarned >= q.dangerNeed ? `过关 ${q.beansEarned}豆` : `−${q.dangerNeed}`;
+  }
+  return `需满${q.dangerNeed}`;
+}
+
+export function MonthCalendar({ quests, onSelectDay }: Props) {
   const { month, setMonth, selectedDate, setSelectedDate } = useApp();
   const today = todayStr();
   const total = daysInMonth(month);
@@ -26,12 +40,7 @@ export function MonthCalendar({ checkIns, onSelectDay }: Props) {
   ];
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const byDate = new Map<string, CheckInDto[]>();
-  for (const c of checkIns) {
-    const list = byDate.get(c.date) ?? [];
-    list.push(c);
-    byDate.set(c.date, list);
-  }
+  const questByDate = new Map(quests.map((q) => [q.date, q]));
 
   return (
     <div>
@@ -65,58 +74,51 @@ export function MonthCalendar({ checkIns, onSelectDay }: Props) {
         {cells.map((day, idx) => {
           if (day === null) return <div key={`e-${idx}`} className="day-cell empty" />;
           const date = `${month}-${String(day).padStart(2, '0')}`;
-          const items = byDate.get(date) ?? [];
+          const quest = questByDate.get(date);
+          const isToday = date === today;
+          const isFuture = date > today;
+          const revealed = Boolean(quest?.revealed);
+          const mystery = isFuture || !revealed;
+          const classes = [
+            'day-cell',
+            isToday ? 'today' : '',
+            date === selectedDate ? 'selected' : '',
+            mystery ? 'mystery' : '',
+            isFuture ? 'future' : '',
+            revealed && quest?.kind === 'happy' ? 'quest-happy' : '',
+            revealed && quest?.kind === 'danger' ? 'quest-danger' : '',
+            revealed && quest?.kind === 'danger' && quest.settled && quest.beansEarned < quest.dangerNeed
+              ? 'failed'
+              : '',
+            revealed && quest?.kind === 'danger' && quest.settled && quest.beansEarned >= quest.dangerNeed
+              ? 'passed'
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' ');
+
           return (
             <button
               key={date}
               type="button"
-              className={`day-cell${date === today ? ' today' : ''}${date === selectedDate ? ' selected' : ''}`}
+              className={classes}
               onClick={() => {
                 setSelectedDate(date);
                 onSelectDay(date);
               }}
             >
-              <span className="day-num">{day}</span>
-              <div className="day-dots">
-                {(() => {
-                  const MAX = 5;
-                  const visible = items.length <= MAX ? items : items.slice(0, MAX - 1);
-                  const overflow = items.length <= MAX ? [] : items.slice(MAX - 1);
-                  return (
-                    <>
-                      {visible.map((c) => (
-                        <span
-                          key={c.id}
-                          className="day-chip"
-                          style={{ ['--chip' as string]: c.tag?.color ?? '#888' }}
-                          title={`${c.tag?.name ?? ''}${c.count > 1 ? ` ×${c.count}` : ''}`}
-                        >
-                          <span className="day-chip-dot" />
-                          {c.count > 1 ? <span className="day-chip-count">×{c.count}</span> : null}
-                        </span>
-                      ))}
-                      {overflow.length > 0 ? (
-                        <span
-                          className="day-chip-more"
-                          title={overflow
-                            .map((c) => `${c.tag?.name ?? ''}×${c.count}`)
-                            .join('、')}
-                        >
-                          <span className="day-more-dots">
-                            {overflow.slice(0, 4).map((c) => (
-                              <i
-                                key={c.id}
-                                style={{ background: c.tag?.color ?? '#888' }}
-                              />
-                            ))}
-                          </span>
-                          <span>+{overflow.length}</span>
-                        </span>
-                      ) : null}
-                    </>
-                  );
-                })()}
-              </div>
+              <span className="day-head">
+                <span className="day-num">{day}</span>
+                {isToday ? <span className="today-mark">今</span> : null}
+              </span>
+              <span className="day-art">
+                {revealed && quest?.kind === 'happy' ? (
+                  <span className="day-mult">×{quest.multiplier.toFixed(1)}</span>
+                ) : null}
+              </span>
+              <span className={`day-caption${mystery ? '' : quest?.kind === 'danger' ? ' danger' : ' happy'}`}>
+                {footer({ mystery, isFuture, quest })}
+              </span>
             </button>
           );
         })}

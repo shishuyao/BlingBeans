@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, assertProfileAccess } from '../auth.js';
-import { getOrCreateBalance, getSlotColors } from '../beans.js';
+import { toBeanDto } from '../beans.js';
+import { backfillBeanPersistence } from '../ledger.js';
 
 export async function beanRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate);
@@ -11,12 +12,7 @@ export async function beanRoutes(app: FastifyInstance) {
     const profile = await assertProfileAccess(request.user.id, query.profileId);
     if (!profile) return reply.status(404).send({ error: '档案不存在' });
 
-    const balance = await getOrCreateBalance(query.profileId);
-    const slotColors = await getSlotColors(query.profileId);
-    return {
-      smallBeans: balance.smallBeans,
-      bigBeans: balance.bigBeans,
-      slotColors,
-    };
+    await backfillBeanPersistence(query.profileId);
+    return toBeanDto(query.profileId);
   });
 }

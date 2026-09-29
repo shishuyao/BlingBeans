@@ -17,12 +17,14 @@ model User {
 }
 
 model Family {
-  id        String         @id @default(cuid())
-  name      String
-  pinHash   String?
-  createdAt DateTime       @default(now())
-  members   FamilyMember[]
-  profiles  Profile[]
+  id           String         @id @default(cuid())
+  name         String
+  pinHash      String?
+  pinEpoch     Int            @default(0)
+  happyDayRate Float          @default(0.8)
+  createdAt    DateTime       @default(now())
+  members      FamilyMember[]
+  profiles     Profile[]
 }
 
 model FamilyMember {
@@ -37,19 +39,22 @@ model FamilyMember {
 }
 
 model Profile {
-  id          String        @id @default(cuid())
-  familyId    String
-  name        String
-  avatarColor String        @default("#4CAF50")
-  sortOrder   Int           @default(0)
-  createdAt   DateTime      @default(now())
-  family      Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  tags        BehaviorTag[]
-  checkIns    CheckIn[]
-  rewards     Reward[]
-  redemptions Redemption[]
-  balance     BeanBalance?
-  beanSlots   BeanSlot[]
+  id           String        @id @default(cuid())
+  familyId     String
+  name         String
+  avatarColor  String        @default("#4CAF50")
+  sortOrder    Int           @default(0)
+  dangerLocked Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  family       Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  tags         BehaviorTag[]
+  checkIns     CheckIn[]
+  rewards      Reward[]
+  redemptions  Redemption[]
+  balance      BeanBalance?
+  beanSlots    BeanSlot[]
+  dayQuests    DayQuest[]
+  beanLedgers  BeanLedger[]
 }
 
 model BehaviorTag {
@@ -66,17 +71,55 @@ model BehaviorTag {
 }
 
 model CheckIn {
-  id        String      @id @default(cuid())
-  profileId String
-  tagId     String
-  date      String
-  count     Int         @default(1)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  profile   Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  tag       BehaviorTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  id           String      @id @default(cuid())
+  profileId    String
+  tagId        String
+  date         String
+  count        Int         @default(1)
+  beansAwarded Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  profile      Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  tag          BehaviorTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([profileId, tagId, date])
+  @@index([profileId, date])
+}
+
+/// Append-only log of bean gains/losses (check-in, undo, redeem, danger settle).
+model BeanLedger {
+  id            String   @id @default(cuid())
+  profileId     String
+  amount        Int
+  reason        String
+  date          String?
+  tagId         String?
+  checkInId     String?
+  redemptionId  String?
+  createdAt     DateTime @default(now())
+  profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, createdAt])
+  @@index([profileId, date])
+  @@index([checkInId])
+  @@index([redemptionId])
+}
+
+/// Per-day treasure hunt roll (happy / danger). Generated once, never rewritten.
+model DayQuest {
+  id          String   @id @default(cuid())
+  profileId   String
+  date        String
+  kind        String
+  multiplier  Float    @default(1)
+  dangerNeed  Int      @default(0)
+  revealed    Boolean  @default(false)
+  settled     Boolean  @default(false)
+  beansEarned Int      @default(0)
+  createdAt   DateTime @default(now())
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, date])
   @@index([profileId, date])
 }
 

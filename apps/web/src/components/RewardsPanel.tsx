@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { canAfford, type RewardDto } from '@guoguo/shared';
 import { api } from '../api';
 import { useApp } from '../appContext';
+import { ImageCropper } from './ImageCropper';
+import { RedeemCelebration } from './RedeemCelebration';
 
 function costLabel(r: { costBig: number; costSmall: number }) {
   const parts: string[] = [];
@@ -21,6 +23,8 @@ export function RewardsPanel() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [celebrating, setCelebrating] = useState<RewardDto | null>(null);
 
   const load = async () => {
     if (!profileId) return;
@@ -40,8 +44,12 @@ export function RewardsPanel() {
     setShowForm(false);
   };
 
-  const onUpload = async (file: File | undefined) => {
+  const onPickPhoto = (file: File | undefined) => {
     if (!file) return;
+    setCropFile(file);
+  };
+
+  const onUpload = async (file: File) => {
     setBusy(true);
     try {
       const { url } = await api.upload(file);
@@ -51,6 +59,11 @@ export function RewardsPanel() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const onCropped = async (file: File) => {
+    setCropFile(null);
+    await onUpload(file);
   };
 
   const submit = async () => {
@@ -87,13 +100,20 @@ export function RewardsPanel() {
     }
   };
 
+  const dangerLocked = Boolean(beans?.dangerLocked);
+
   const redeem = async (reward: RewardDto) => {
+    if (dangerLocked) {
+      setError('危险模式中，先打卡攒够豆再兑奖');
+      return;
+    }
     if (!confirm(`确认兑换「${reward.title}」？`)) return;
     setBusy(true);
     setError('');
     try {
       const res = await api.rewards.redeem(reward.id);
       setBeans(res.beans);
+      setCelebrating(reward);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : '兑换失败');
@@ -111,6 +131,11 @@ export function RewardsPanel() {
   return (
     <div>
       {error ? <div className="error-banner">{error}</div> : null}
+      {dangerLocked ? (
+        <div className="danger-mode-banner" style={{ marginBottom: 12 }}>
+          危险模式锁定兑奖 · 今天打卡超过 5 颗豆即可解锁
+        </div>
+      ) : null}
 
       <div className="form-inline" style={{ marginBottom: 12 }}>
         <button
@@ -159,10 +184,13 @@ export function RewardsPanel() {
               type="file"
               accept="image/*"
               capture="environment"
-              onChange={(e) => onUpload(e.target.files?.[0])}
+              onChange={(e) => {
+                onPickPhoto(e.target.files?.[0]);
+                e.target.value = '';
+              }}
             />
             {photoUrl ? (
-              <img src={photoUrl} alt="预览" style={{ marginTop: 8, borderRadius: 12, maxHeight: 140 }} />
+              <img src={photoUrl} alt="预览" style={{ marginTop: 8, borderRadius: 12, maxHeight: 140, objectFit: 'cover' }} />
             ) : null}
           </div>
           <div className="form-inline">
@@ -193,10 +221,10 @@ export function RewardsPanel() {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={busy || !affordable}
+                  disabled={busy || !affordable || dangerLocked}
                   onClick={() => redeem(r)}
                 >
-                  兑换
+                  {dangerLocked ? '已锁定' : '兑换'}
                 </button>
                 <div className="form-inline">
                   <button
@@ -228,6 +256,17 @@ export function RewardsPanel() {
           );
         })}
       </div>
+      {cropFile ? (
+        <ImageCropper
+          file={cropFile}
+          aspect={4 / 3}
+          onCancel={() => setCropFile(null)}
+          onConfirm={onCropped}
+        />
+      ) : null}
+      {celebrating ? (
+        <RedeemCelebration reward={celebrating} onDone={() => setCelebrating(null)} />
+      ) : null}
     </div>
   );
 }

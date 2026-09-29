@@ -2,9 +2,12 @@ import type {
   BeanBalanceDto,
   BehaviorTagDto,
   CheckInDto,
+  DayQuestDto,
   MergeEvent,
   MonthSummaryDto,
   ProfileDto,
+  QuestsMonthDto,
+  RevealEvent,
   RewardDto,
   RedemptionDto,
 } from '@guoguo/shared';
@@ -20,18 +23,24 @@ export class ApiError extends Error {
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const isForm = options?.body instanceof FormData;
+  const hasJsonBody = options?.body != null && !isForm;
   const res = await fetch(url, {
     credentials: 'include',
+    ...options,
     headers: {
-      ...(options?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+      ...(hasJsonBody ? { 'Content-Type': 'application/json' } : {}),
       ...options?.headers,
     },
-    ...options,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const body = data as { error?: string; code?: string };
-    throw new ApiError(body.error ?? `请求失败 (${res.status})`, res.status, body.code);
+    const body = data as { error?: string; message?: string; code?: string };
+    const message =
+      body.error && body.error !== 'Bad Request'
+        ? body.error
+        : body.message ?? body.error ?? `请求失败 (${res.status})`;
+    throw new ApiError(message, res.status, body.code);
   }
   return data as T;
 }
@@ -46,6 +55,7 @@ export type MeResponse = {
   user: { id: string; email: string; name: string };
   familyId: string;
   familyName: string;
+  happyDayRate?: number;
   profiles: ProfileDto[];
   pin?: PinStatus;
 };
@@ -111,6 +121,9 @@ export const api = {
         checkIn: CheckInDto;
         beans: BeanBalanceDto;
         mergeEvents: MergeEvent[];
+        quest?: DayQuestDto;
+        reveal?: RevealEvent;
+        dangerUnlocked?: boolean;
       }>('/api/checkins', { method: 'POST', body: JSON.stringify(body) }),
     decrement: (body: { profileId: string; tagId: string; date: string }) =>
       request<{
@@ -122,6 +135,20 @@ export const api = {
 
   beans: {
     get: (profileId: string) => request<BeanBalanceDto>(`/api/beans?profileId=${profileId}`),
+  },
+
+  quests: {
+    month: (profileId: string, month: string) =>
+      request<QuestsMonthDto>(`/api/quests?profileId=${profileId}&month=${month}`),
+  },
+
+  settings: {
+    get: () => request<{ happyDayRate: number }>('/api/settings'),
+    update: (body: { happyDayRate: number }) =>
+      request<{ happyDayRate: number }>('/api/settings', {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
   },
 
   rewards: {

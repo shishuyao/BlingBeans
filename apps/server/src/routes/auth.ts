@@ -146,6 +146,7 @@ export async function authRoutes(app: FastifyInstance) {
       user: { id: user.id, email: user.email, name: user.name },
       familyId: membership?.familyId,
       familyName: membership?.family.name,
+      happyDayRate: membership?.family.happyDayRate ?? 0.8,
       profiles: membership?.family.profiles ?? [],
       pin: pinStatus,
     };
@@ -185,7 +186,7 @@ export async function authRoutes(app: FastifyInstance) {
       data: { pinHash },
     });
 
-    const expiresAt = setParentCookie(reply, app, request.user.id, family.id);
+    const expiresAt = setParentCookie(reply, app, request.user.id, family.id, family.pinEpoch);
     return { ok: true, hasPin: true, unlocked: true, expiresAt };
   });
 
@@ -204,11 +205,15 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(401).send({ error: 'PIN 不正确' });
     }
 
-    const expiresAt = setParentCookie(reply, app, request.user.id, family.id);
+    const expiresAt = setParentCookie(reply, app, request.user.id, family.id, family.pinEpoch);
     return { ok: true, hasPin: true, unlocked: true, expiresAt };
   });
 
-  app.post('/pin/lock', { preHandler: authenticate }, async (_request, reply) => {
+  app.post('/pin/lock', { preHandler: authenticate }, async (request, reply) => {
+    await prisma.family.update({
+      where: { id: request.user.familyId },
+      data: { pinEpoch: { increment: 1 } },
+    });
     clearParentCookie(reply);
     return { ok: true, unlocked: false };
   });

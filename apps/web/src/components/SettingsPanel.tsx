@@ -21,6 +21,8 @@ export function SettingsPanel() {
   const [color, setColor] = useState<string>(TAG_COLORS[1]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [happyRate, setHappyRate] = useState(() => Math.round((me?.happyDayRate ?? 0.8) * 100));
+  const [rateBusy, setRateBusy] = useState(false);
 
   const addProfile = async () => {
     if (!name.trim()) return;
@@ -35,6 +37,22 @@ export function SettingsPanel() {
       setError(e instanceof Error ? e.message : '创建失败');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const saveHappyRate = async (percent: number) => {
+    const next = Math.min(100, Math.max(50, percent)) / 100;
+    if (Math.round((me?.happyDayRate ?? 0.8) * 100) === Math.round(next * 100)) return;
+    setRateBusy(true);
+    setError('');
+    try {
+      const res = await api.settings.update({ happyDayRate: next });
+      setHappyRate(Math.round(res.happyDayRate * 100));
+      await refreshMe();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '保存失败');
+    } finally {
+      setRateBusy(false);
     }
   };
 
@@ -106,6 +124,34 @@ export function SettingsPanel() {
       </div>
 
       {error ? <div className="error-banner">{error}</div> : null}
+
+      <div className="panel">
+        <h3>探宝日历</h3>
+        <p style={{ margin: '0 0 10px', color: 'var(--ink-muted)', fontWeight: 700, fontSize: '0.9rem' }}>
+          开心日概率 {happyRate}% · 危险日 {100 - happyRate}%
+          <br />
+          只影响还没生成的日子，已经开过的格子不会变。
+        </p>
+        <input
+          type="range"
+          min={50}
+          max={100}
+          step={5}
+          value={happyRate}
+          aria-label="开心日概率"
+          onChange={(e) => setHappyRate(Number(e.target.value))}
+          onPointerUp={(e) => {
+            void saveHappyRate(Number((e.currentTarget as HTMLInputElement).value));
+          }}
+          onKeyUp={(e) => {
+            void saveHappyRate(Number((e.currentTarget as HTMLInputElement).value));
+          }}
+          style={{ width: '100%' }}
+        />
+        {rateBusy ? (
+          <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: 'var(--ink-muted)' }}>保存中…</p>
+        ) : null}
+      </div>
 
       <div className="panel">
         <h3>成员档案</h3>

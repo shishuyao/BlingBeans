@@ -39,7 +39,10 @@ export function App() {
   const [unlockUntil, setUnlockUntil] = useState<string | null>(null);
   const [pinModal, setPinModal] = useState<PinModalMode | null>(null);
   const [nowTick, setNowTick] = useState(0);
+  const [headerCompact, setHeaderCompact] = useState(false);
   const pinResolver = useRef<((ok: boolean) => void) | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const lastScrollY = useRef(0);
 
   const applyPinStatus = useCallback((pin?: PinStatus) => {
     if (!pin) {
@@ -119,11 +122,15 @@ export function App() {
   }, [applyPinStatus]);
 
   const lockParent = useCallback(async () => {
-    await api.pin.lock();
     setParentUnlocked(false);
     setUnlockUntil(null);
     if (view === 'tags' || view === 'rewards' || view === 'settings') {
       setViewState('calendar');
+    }
+    try {
+      await api.pin.lock();
+    } catch {
+      /* keep locked locally even if the request fails */
     }
   }, [view]);
 
@@ -179,6 +186,31 @@ export function App() {
       clearInterval(tick);
     };
   }, [hasPin, parentUnlocked, unlockUntil]);
+
+  useEffect(() => {
+    setHeaderCompact(false);
+    lastScrollY.current = 0;
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+  }, [view, profileId]);
+
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const y = el.scrollTop;
+      if (y < 12) {
+        setHeaderCompact(false);
+        lastScrollY.current = y;
+        return;
+      }
+      const dy = y - lastScrollY.current;
+      if (dy > 8) setHeaderCompact(true);
+      else if (dy < -8) setHeaderCompact(false);
+      lastScrollY.current = y;
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [me]);
 
   const enqueueMerges = useCallback((events: MergeEvent[]) => {
     if (!events.length) return;
@@ -276,61 +308,77 @@ export function App() {
         <AuthPage />
       ) : (
         <div className="app-shell">
-          <header className="top-bar">
-            <div className="brand-row">
-              <div className="brand">果果豆豆</div>
-              <div className="brand-actions">
-                <button
-                  type="button"
-                  className={`lock-btn${parentUnlocked && hasPin ? ' unlocked' : ''}`}
-                  title={
-                    !hasPin
-                      ? '未设置家长 PIN'
-                      : parentUnlocked
-                        ? `已解锁 · 剩余 ${remainingUnlockLabel(unlockUntil)}`
-                        : '已锁定 · 点击解锁'
-                  }
-                  onClick={async () => {
-                    if (!hasPin) {
-                      openPinModal('setup');
-                      return;
+          <header className={`top-bar${headerCompact ? ' compact' : ''}`}>
+            <div className="top-chrome">
+              <div className="brand-row">
+                <div className="brand">果果豆豆</div>
+                <div className="brand-actions">
+                  <button
+                    type="button"
+                    className={`lock-btn${parentUnlocked && hasPin ? ' unlocked' : ''}`}
+                    aria-label={
+                      !hasPin
+                        ? '设置家长 PIN'
+                        : parentUnlocked
+                          ? '锁定家长 PIN'
+                          : '解锁家长 PIN'
                     }
-                    if (parentUnlocked) {
-                      await lockParent();
-                    } else {
-                      await ensureParent();
+                    title={
+                      !hasPin
+                        ? '未设置家长 PIN'
+                        : parentUnlocked
+                          ? `已解锁 · 点击锁定 · 剩余 ${remainingUnlockLabel(unlockUntil)}`
+                          : '已锁定 · 点击解锁'
                     }
-                  }}
-                >
-                  {!hasPin ? '🔑' : parentUnlocked ? '🔓' : '🔒'}
-                </button>
-                <div className="profile-switch">
-                  {profiles.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className={`profile-chip${p.id === profileId ? ' active' : ''}`}
-                      style={p.id === profileId ? { borderColor: p.avatarColor } : undefined}
-                      onClick={() => setProfileId(p.id)}
-                    >
-                      {p.name}
-                    </button>
-                  ))}
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (!hasPin) {
+                        openPinModal('setup');
+                        return;
+                      }
+                      if (parentUnlocked) {
+                        await lockParent();
+                      } else {
+                        openPinModal('unlock');
+                      }
+                    }}
+                  >
+                    {!hasPin ? '🔑' : parentUnlocked ? '🔓' : '🔒'}
+                  </button>
+                  <div className="profile-switch">
+                    {profiles.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className={`profile-chip${p.id === profileId ? ' active' : ''}`}
+                        style={p.id === profileId ? { borderColor: p.avatarColor } : undefined}
+                        onClick={() => setProfileId(p.id)}
+                      >
+                        {p.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
             <BeanProgressBar />
-            {hasPin && !parentUnlocked ? (
-              <div className="kid-mode-banner">孩子模式 · 打卡/兑奖需家长解锁</div>
-            ) : null}
-            {hasPin && parentUnlocked ? (
-              <div className="parent-mode-banner">
-                家长已解锁 · 约 {remainingUnlockLabel(unlockUntil)}后自动锁定
-              </div>
-            ) : null}
+            <div className="top-chrome">
+              {beans?.dangerLocked ? (
+                <div className="danger-mode-banner">危险模式 · 先打卡攒够豆（当天超过 5 颗即可解锁兑奖）</div>
+              ) : null}
+              {hasPin && !parentUnlocked ? (
+                <div className="kid-mode-banner">孩子模式 · 打卡/兑奖需家长解锁</div>
+              ) : null}
+              {hasPin && parentUnlocked ? (
+                <div className="parent-mode-banner">
+                  家长已解锁 · 约 {remainingUnlockLabel(unlockUntil)}后自动锁定
+                </div>
+              ) : null}
+            </div>
           </header>
 
-          <main>
+          <main ref={mainRef}>
             {view === 'calendar' ? <CalendarView /> : null}
             {view === 'tags' ? <TagsPanel /> : null}
             {view === 'rewards' ? <RewardsPanel /> : null}

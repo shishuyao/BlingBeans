@@ -15,6 +15,8 @@ import { beanRoutes } from './routes/beans.js';
 import { rewardRoutes } from './routes/rewards.js';
 import { summaryRoutes } from './routes/summary.js';
 import { uploadRoutes } from './routes/uploads.js';
+import { questRoutes } from './routes/quests.js';
+import { settingsRoutes } from './routes/settings.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -50,6 +52,8 @@ async function main() {
   await app.register(rewardRoutes, { prefix: '/api/rewards' });
   await app.register(summaryRoutes, { prefix: '/api/summary' });
   await app.register(uploadRoutes, { prefix: '/api/uploads' });
+  await app.register(questRoutes, { prefix: '/api/quests' });
+  await app.register(settingsRoutes, { prefix: '/api/settings' });
 
   // Serve web build in production
   const webDist = path.resolve(__dirname, '../../web/dist');

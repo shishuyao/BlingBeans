@@ -139,3 +139,46 @@ export async function deductCost(
   const need = costSmall + costBig * SMALL_PER_BIG;
   return removeBeans(profileId, need);
 }
+
+/** Deduct up to `amount` beans; never fails. Used by danger-day settlement. */
+export async function removeBeansUpTo(
+  profileId: string,
+  amount: number
+): Promise<{ smallBeans: number; bigBeans: number; slotColors: string[]; deducted: number }> {
+  const balance = await getOrCreateBalance(profileId);
+  const total = balance.smallBeans + balance.bigBeans * SMALL_PER_BIG;
+  const take = Math.min(total, Math.max(0, amount));
+  if (take <= 0) {
+    return {
+      smallBeans: balance.smallBeans,
+      bigBeans: balance.bigBeans,
+      slotColors: await getSlotColors(profileId),
+      deducted: 0,
+    };
+  }
+  const result = await removeBeans(profileId, take);
+  if (!result) {
+    return {
+      smallBeans: balance.smallBeans,
+      bigBeans: balance.bigBeans,
+      slotColors: await getSlotColors(profileId),
+      deducted: 0,
+    };
+  }
+  return { ...result, deducted: take };
+}
+
+export async function toBeanDto(profileId: string) {
+  const balance = await getOrCreateBalance(profileId);
+  const slotColors = await getSlotColors(profileId);
+  const profile = await prisma.profile.findUniqueOrThrow({
+    where: { id: profileId },
+    select: { dangerLocked: true },
+  });
+  return {
+    smallBeans: balance.smallBeans,
+    bigBeans: balance.bigBeans,
+    slotColors,
+    dangerLocked: profile.dangerLocked,
+  };
+}

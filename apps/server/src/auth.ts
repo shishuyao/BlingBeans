@@ -13,6 +13,7 @@ export type ParentPayload = {
   type: 'parent';
   familyId: string;
   userId: string;
+  pinEpoch: number;
 };
 
 declare module '@fastify/jwt' {
@@ -58,7 +59,11 @@ export async function getParentStatus(app: FastifyInstance, request: FastifyRequ
   if (hasPin && token) {
     try {
       const payload = app.jwt.verify<ParentPayload>(token);
-      if (payload.type === 'parent' && payload.familyId === familyId) {
+      if (
+        payload.type === 'parent' &&
+        payload.familyId === familyId &&
+        (payload.pinEpoch ?? 0) === family.pinEpoch
+      ) {
         unlocked = true;
         const decoded = app.jwt.decode(token) as { exp?: number } | null;
         if (decoded?.exp) expiresAt = new Date(decoded.exp * 1000).toISOString();
@@ -96,7 +101,11 @@ export async function requireParent(request: FastifyRequest, reply: FastifyReply
   try {
     const app = request.server;
     const payload = app.jwt.verify<ParentPayload>(token);
-    if (payload.type !== 'parent' || payload.familyId !== familyId) {
+    if (
+      payload.type !== 'parent' ||
+      payload.familyId !== familyId ||
+      (payload.pinEpoch ?? 0) !== family.pinEpoch
+    ) {
       return reply.status(403).send({ error: '需要家长解锁', code: 'PARENT_LOCK' });
     }
   } catch {
@@ -104,9 +113,15 @@ export async function requireParent(request: FastifyRequest, reply: FastifyReply
   }
 }
 
-export function setParentCookie(reply: FastifyReply, app: FastifyInstance, userId: string, familyId: string) {
+export function setParentCookie(
+  reply: FastifyReply,
+  app: FastifyInstance,
+  userId: string,
+  familyId: string,
+  pinEpoch: number
+) {
   const token = app.jwt.sign(
-    { type: 'parent', familyId, userId } satisfies ParentPayload,
+    { type: 'parent', familyId, userId, pinEpoch } satisfies ParentPayload,
     { expiresIn: PARENT_TTL_SEC }
   );
   reply.setCookie('parentToken', token, {
@@ -120,10 +135,13 @@ export function setParentCookie(reply: FastifyReply, app: FastifyInstance, userI
 }
 
 export function clearParentCookie(reply: FastifyReply) {
-  reply.clearCookie('parentToken', {
+  reply.clearCookie('parentToken', { path: '/' });
+  reply.setCookie('parentToken', '', {
     path: '/',
     httpOnly: true,
     sameSite: 'lax',
     secure: false,
+    expires: new Date(0),
+    maxAge: 0,
   });
 }

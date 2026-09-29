@@ -1,8 +1,18 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { awardBeansForQuest } from '@guoguo/shared';
 import { prisma } from '../db.js';
 import { authenticate, assertProfileAccess, requireParent } from '../auth.js';
-import { addBeans, removeBeans } from '../beans.js';
+import { addBeans, removeBeans, toBeanDto } from '../beans.js';
+import { appendBeanLedger } from '../ledger.js';
+import { shanghaiToday } from '../dates.js';
+import { ensureQuest } from '../quests.js';
+
+function dateGuardMessage(date: string, today: string) {
+  if (date > today) return '这一天还没到';
+  if (date < today) return '已经过去的日子不能再改';
+  return null;
+}
 
 export async function checkInRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate);
@@ -41,10 +51,19 @@ export async function checkInRoutes(app: FastifyInstance) {
     const profile = await assertProfileAccess(request.user.id, body.profileId);
     if (!profile) return reply.status(404).send({ error: '档案不存在' });
 
+    const today = shanghaiToday();
+    const blocked = dateGuardMessage(body.date, today);
+    if (blocked) return reply.status(400).send({ error: blocked, code: 'DATE_LOCKED' });
+
     const tag = await prisma.behaviorTag.findFirst({
       where: { id: body.tagId, profileId: body.profileId, active: true },
     });
     if (!tag) return reply.status(404).send({ error: '标签不存在' });
+
+    const quest = await ensureQuest(body.profileId, body.date);
+    const kind = quest.kind === 'danger' ? 'danger' : 'happy';
+    const award = awardBeansForQuest(tag.beansOnComplete, kind, quest.multiplier);
+    const justRevealed = !quest.revealed;
 
     const existing = await prisma.checkIn.findUnique({
       where: {
@@ -60,7 +79,7 @@ export async function checkInRoutes(app: FastifyInstance) {
     if (existing) {
       checkIn = await prisma.checkIn.update({
         where: { id: existing.id },
-        data: { count: { increment: 1 } },
+        data: { count: { increment: 1 }, beansAwarded: { increment: award } },
         include: { tag: true },
       });
     } else {
@@ -70,26 +89,66 @@ export async function checkInRoutes(app: FastifyInstance) {
           tagId: body.tagId,
           date: body.date,
           count: 1,
+          beansAwarded: award,
         },
         include: { tag: true },
       });
     }
 
-    const beanResult = await addBeans(
-      body.profileId,
-      tag.beansOnComplete,
-      tag.color,
-      tag.id
-    );
+    const nextEarned = quest.beansEarned + award;
+    await prisma.dayQuest.update({
+      where: { id: quest.id },
+      data: {
+        revealed: true,
+        beansEarned: nextEarned,
+      },
+    });
+
+    const beanResult = await addBeans(body.profileId, award, tag.color, tag.id);
+    await appendBeanLedger({
+      profileId: body.profileId,
+      amount: award,
+      reason: 'checkin',
+      date: body.date,
+      tagId: tag.id,
+      checkInId: checkIn.id,
+    });
+
+    let dangerUnlocked = false;
+    const fresh = await prisma.profile.findUniqueOrThrow({
+      where: { id: body.profileId },
+      select: { dangerLocked: true },
+    });
+    if (fresh.dangerLocked && nextEarned > 5) {
+      await prisma.profile.update({
+        where: { id: body.profileId },
+        data: { dangerLocked: false },
+      });
+      dangerUnlocked = true;
+    }
 
     return {
       checkIn,
-      beans: {
-        smallBeans: beanResult.smallBeans,
-        bigBeans: beanResult.bigBeans,
-        slotColors: beanResult.slotColors,
-      },
+      beans: await toBeanDto(body.profileId),
       mergeEvents: beanResult.mergeEvents,
+      quest: {
+        date: quest.date,
+        kind,
+        multiplier: quest.multiplier,
+        dangerNeed: quest.dangerNeed,
+        revealed: true,
+        settled: quest.settled,
+        beansEarned: nextEarned,
+      },
+      reveal: justRevealed
+        ? {
+            kind,
+            multiplier: quest.multiplier,
+            dangerNeed: quest.dangerNeed,
+            beansAwarded: award,
+          }
+        : undefined,
+      dangerUnlocked,
     };
   });
 
@@ -105,6 +164,10 @@ export async function checkInRoutes(app: FastifyInstance) {
     const profile = await assertProfileAccess(request.user.id, body.profileId);
     if (!profile) return reply.status(404).send({ error: '档案不存在' });
 
+    const today = shanghaiToday();
+    const blocked = dateGuardMessage(body.date, today);
+    if (blocked) return reply.status(400).send({ error: blocked, code: 'DATE_LOCKED' });
+
     const existing = await prisma.checkIn.findUnique({
       where: {
         profileId_tagId_date: {
@@ -117,7 +180,9 @@ export async function checkInRoutes(app: FastifyInstance) {
     });
     if (!existing) return reply.status(404).send({ error: '没有打卡记录' });
 
-    const beansToRemove = existing.tag.beansOnComplete;
+    const quest = await ensureQuest(body.profileId, body.date);
+    const kind = quest.kind === 'danger' ? 'danger' : 'happy';
+    const beansToRemove = awardBeansForQuest(existing.tag.beansOnComplete, kind, quest.multiplier);
     const beanResult = await removeBeans(body.profileId, beansToRemove);
     if (!beanResult) {
       return reply.status(400).send({ error: '豆豆不足，无法撤销（可能已用于兑换）' });
@@ -129,14 +194,30 @@ export async function checkInRoutes(app: FastifyInstance) {
     } else {
       checkIn = await prisma.checkIn.update({
         where: { id: existing.id },
-        data: { count: { decrement: 1 } },
+        data: {
+          count: { decrement: 1 },
+          beansAwarded: Math.max(0, existing.beansAwarded - beansToRemove),
+        },
         include: { tag: true },
       });
     }
 
+    await prisma.dayQuest.update({
+      where: { id: quest.id },
+      data: { beansEarned: Math.max(0, quest.beansEarned - beansToRemove) },
+    });
+    await appendBeanLedger({
+      profileId: body.profileId,
+      amount: -beansToRemove,
+      reason: 'undo',
+      date: body.date,
+      tagId: existing.tagId,
+      checkInId: existing.id,
+    });
+
     return {
       checkIn,
-      beans: beanResult,
+      beans: await toBeanDto(body.profileId),
       mergeEvents: [],
     };
   });

@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, type Dispatch, type SetStateAction } from 'react';
 import type { BeanBalanceDto, MergeEvent, ProfileDto } from '@guoguo/shared';
 import type { MeResponse } from './api';
 
@@ -22,7 +22,7 @@ export type AppState = {
   setMe: (me: MeResponse | null) => void;
   setProfileId: (id: string) => void;
   setProfiles: (p: ProfileDto[]) => void;
-  setBeans: (b: BeanBalanceDto | null) => void;
+  setBeans: Dispatch<SetStateAction<BeanBalanceDto | null>>;
   setView: (v: AppView) => void | Promise<void>;
   setMonth: (m: string) => void;
   setSelectedDate: (d: string) => void;

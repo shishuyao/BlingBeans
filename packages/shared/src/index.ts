@@ -36,6 +36,8 @@ export type CheckInDto = {
   tagId: string;
   date: string;
   count: number;
+  /** Actual beans granted for this row (includes happy-day rounding). */
+  beansAwarded: number;
   tag?: BehaviorTagDto;
 };
 
@@ -44,7 +46,40 @@ export type BeanBalanceDto = {
   bigBeans: number;
   /** Colors filling the current 10-slot progress (left to right) */
   slotColors: string[];
+  dangerLocked: boolean;
 };
+
+export type DayQuestKind = 'happy' | 'danger';
+
+export type DayQuestDto = {
+  date: string;
+  kind: DayQuestKind;
+  multiplier: number;
+  dangerNeed: number;
+  revealed: boolean;
+  settled: boolean;
+  beansEarned: number;
+};
+
+export type RevealEvent = {
+  kind: DayQuestKind;
+  multiplier: number;
+  dangerNeed: number;
+  beansAwarded: number;
+};
+
+export type QuestsMonthDto = {
+  month: string;
+  quests: DayQuestDto[];
+  dangerLocked: boolean;
+  happyDayRate: number;
+};
+
+/** Happy-day beans: round(tagBeans × multiplier), at least 1. Danger-day: tag beans as-is. */
+export function awardBeansForQuest(base: number, kind: DayQuestKind, multiplier: number): number {
+  if (kind === 'happy') return Math.max(1, Math.round(base * multiplier));
+  return Math.max(1, base);
+}
 
 export type MergeEvent = {
   fromSmall: number;
