@@ -9,12 +9,12 @@ export function SummaryPanel() {
   const [data, setData] = useState<MonthSummaryDto | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [albumOpen, setAlbumOpen] = useState<number | null>(null);
+  const [albumOpen, setAlbumOpen] = useState(false);
 
   useEffect(() => {
     if (!profileId) return;
     setLoading(true);
-    setAlbumOpen(null);
+    setAlbumOpen(false);
     api
       .summary(profileId, month)
       .then(setData)
@@ -75,12 +75,12 @@ export function SummaryPanel() {
               <p className="empty-hint">本月还没有兑换奖励</p>
             ) : (
               <div className="redeem-wall">
-                {data.redemptions.map((r, i) => (
+                {data.redemptions.map((r) => (
                   <button
                     key={r.id}
                     type="button"
                     className="redeem-tile"
-                    onClick={() => setAlbumOpen(i)}
+                    onClick={() => setAlbumOpen(true)}
                   >
                     {r.reward?.photoUrl ? (
                       <img src={r.reward.photoUrl} alt={r.reward.title} />
@@ -93,13 +93,8 @@ export function SummaryPanel() {
               </div>
             )}
           </div>
-          {albumOpen != null && data.redemptions[albumOpen] ? (
-            <RedeemDetailSheet
-              items={data.redemptions}
-              index={albumOpen}
-              onIndex={setAlbumOpen}
-              onClose={() => setAlbumOpen(null)}
-            />
+          {albumOpen ? (
+            <RedeemDetailSheet items={data.redemptions} onClose={() => setAlbumOpen(false)} />
           ) : null}
         </>
       )}

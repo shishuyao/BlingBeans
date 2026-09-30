@@ -37,7 +37,7 @@ type Props = {
 };
 
 export function RedeemTimeline({ redemptions, emptyHint = '还没有兑换记录' }: Props) {
-  const [open, setOpen] = useState<{ items: RedemptionDto[]; index: number } | null>(null);
+  const [openItems, setOpenItems] = useState<RedemptionDto[] | null>(null);
 
   const groups = useMemo<DayGroup[]>(() => {
     const map = new Map<string, RedemptionDto[]>();
@@ -73,7 +73,7 @@ export function RedeemTimeline({ redemptions, emptyHint = '还没有兑换记录
                   <button
                     type="button"
                     className={`tl-stack${g.items.length > 1 ? ' multi' : ''}`}
-                    onClick={() => setOpen({ items: g.items, index: 0 })}
+                    onClick={() => setOpenItems(g.items)}
                     aria-label={`${dateHeading(g.date)}的兑换，共${g.items.length}张`}
                   >
                     {preview.map((item, i) => (
@@ -100,66 +100,51 @@ export function RedeemTimeline({ redemptions, emptyHint = '还没有兑换记录
         </div>
       )}
 
-      {open ? (
-        <RedeemDetailSheet
-          items={open.items}
-          index={open.index}
-          onIndex={(index) => setOpen({ ...open, index })}
-          onClose={() => setOpen(null)}
-        />
-      ) : null}
+      {openItems ? <RedeemDetailSheet items={openItems} onClose={() => setOpenItems(null)} /> : null}
     </div>
   );
 }
 
+function galleryTitle(items: RedemptionDto[]) {
+  if (items.length === 0) return '兑换相册';
+  const keys = new Set(items.map((row) => formatDate(new Date(row.redeemedAt))));
+  if (keys.size === 1) {
+    const [only] = keys;
+    return `${dateHeading(only)} · ${items.length} 张`;
+  }
+  return `兑换相册 · ${items.length} 张`;
+}
+
 export function RedeemDetailSheet({
   items,
-  index,
-  onIndex,
   onClose,
 }: {
   items: RedemptionDto[];
-  index: number;
-  onIndex: (index: number) => void;
   onClose: () => void;
 }) {
-  const current = items[index];
-  if (!current) return null;
+  if (items.length === 0) return null;
+  const title = galleryTitle(items);
 
   return (
     <>
       <div className="sheet-backdrop" onClick={onClose} />
-      <div className="sheet tl-detail-sheet" role="dialog" aria-label="兑换详情">
-        <h3>兑换详情</h3>
-        <div className="tl-detail-card">
-          {current.reward?.photoUrl ? (
-            <img src={current.reward.photoUrl} alt={current.reward.title} />
-          ) : (
-            <div className="tl-detail-empty">🎁</div>
-          )}
-          <div className="tl-detail-card-cap">{current.reward?.title ?? '奖励'}</div>
+      <div className="sheet tl-detail-sheet" role="dialog" aria-label={title}>
+        <h3>{title}</h3>
+        <div className="tl-gallery">
+          {items.map((item) => (
+            <article key={item.id} className="tl-gallery-card">
+              {item.reward?.photoUrl ? (
+                <img src={item.reward.photoUrl} alt={item.reward.title} />
+              ) : (
+                <div className="tl-gallery-empty">🎁</div>
+              )}
+              <div className="tl-gallery-cap">{item.reward?.title ?? '奖励'}</div>
+              <div className="tl-gallery-meta">{fullDateTime(item.redeemedAt)}</div>
+              <div className="tl-gallery-cost">花费 {costLabel(item)}</div>
+            </article>
+          ))}
         </div>
-        <div className="tl-detail-meta">{fullDateTime(current.redeemedAt)}</div>
-        <div className="tl-detail-cost">花费 {costLabel(current)}</div>
-        {items.length > 1 ? (
-          <div className="tl-pager">
-            <button type="button" className="btn btn-ghost" disabled={index === 0} onClick={() => onIndex(index - 1)}>
-              上一张
-            </button>
-            <span>
-              {index + 1} / {items.length}
-            </span>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              disabled={index >= items.length - 1}
-              onClick={() => onIndex(index + 1)}
-            >
-              下一张
-            </button>
-          </div>
-        ) : null}
-        <button type="button" className="btn btn-ghost" style={{ width: '100%', marginTop: 12 }} onClick={onClose}>
+        <button type="button" className="btn btn-ghost" style={{ width: '100%', marginTop: 14 }} onClick={onClose}>
           关闭
         </button>
       </div>
