@@ -63,11 +63,14 @@ export function CalendarView() {
     try {
       const res = await api.checkIns.add({ profileId, tagId, date: sheetDate });
       setBeans(res.beans);
+      const minus = tags.find((t) => t.id === tagId)?.kind === 'minus';
       if (res.reveal) {
         setPendingMerges(res.mergeEvents);
         setReveal(res.reveal);
       } else if (res.mergeEvents.length) {
         enqueueMerges(res.mergeEvents);
+      } else if (minus) {
+        playUndoSound();
       } else {
         playCheckInSound();
       }
@@ -92,7 +95,8 @@ export function CalendarView() {
     try {
       const res = await api.checkIns.decrement({ profileId, tagId, date: sheetDate });
       setBeans(res.beans);
-      playUndoSound();
+      if (tags.find((t) => t.id === tagId)?.kind === 'minus') playCheckInSound();
+      else playUndoSound();
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : '撤销失败');

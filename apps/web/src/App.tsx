@@ -364,7 +364,9 @@ export function App() {
             </div>
             <BeanProgressBar />
             <div className="top-chrome">
-              {beans?.dangerLocked ? (
+              {beans?.debtLocked ? (
+                <div className="danger-mode-banner">豆豆锁定 · 欠豆已到 5 颗，先打卡加豆</div>
+              ) : beans?.dangerLocked ? (
                 <div className="danger-mode-banner">危险模式 · 先打卡攒够豆（当天超过 5 颗即可解锁兑奖）</div>
               ) : null}
               {hasPin && !parentUnlocked ? (

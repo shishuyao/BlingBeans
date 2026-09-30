@@ -1,7 +1,7 @@
 import { SMALL_PER_BIG } from '@guoguo/shared';
 import { prisma } from './db.js';
 
-export type BeanLedgerReason = 'checkin' | 'undo' | 'redeem' | 'danger_settle';
+export type BeanLedgerReason = 'checkin' | 'undo' | 'penalty' | 'penalty_undo' | 'redeem' | 'danger_settle';
 
 export async function appendBeanLedger(input: {
   profileId: string;
@@ -28,9 +28,10 @@ export async function appendBeanLedger(input: {
   });
 }
 
-function historicalAward(count: number, tagBeans: number, stored: number) {
-  if (stored > 0) return stored;
-  return count * tagBeans;
+function historicalAward(count: number, tag: { beansOnComplete: number; kind: string }, stored: number) {
+  if (stored !== 0) return stored;
+  if (tag.kind === 'minus') return -(count * tag.beansOnComplete);
+  return count * tag.beansOnComplete;
 }
 
 /** Fill beansAwarded on old check-ins and write missing ledger rows. Does not change current balance. */
@@ -40,7 +41,7 @@ export async function backfillBeanPersistence(profileId: string) {
     include: { tag: true },
   });
   for (const row of checkIns) {
-    const amount = historicalAward(row.count, row.tag.beansOnComplete, row.beansAwarded);
+    const amount = historicalAward(row.count, row.tag, row.beansAwarded);
     if (row.beansAwarded !== amount) {
       await prisma.checkIn.update({
         where: { id: row.id },

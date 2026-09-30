@@ -4,6 +4,7 @@ import { authenticate, assertProfileAccess } from '../auth.js';
 import { prisma } from '../db.js';
 import { listMonthQuests } from '../quests.js';
 import { backfillBeanPersistence } from '../ledger.js';
+import { toBeanDto } from '../beans.js';
 
 export async function questRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate);
@@ -24,15 +25,12 @@ export async function questRoutes(app: FastifyInstance) {
     });
     await backfillBeanPersistence(query.profileId);
     const quests = await listMonthQuests(query.profileId, query.month);
-    const fresh = await prisma.profile.findUniqueOrThrow({
-      where: { id: query.profileId },
-      select: { dangerLocked: true },
-    });
+    const beans = await toBeanDto(query.profileId);
 
     return {
       month: query.month,
       quests,
-      dangerLocked: fresh.dangerLocked,
+      dangerLocked: beans.dangerLocked,
       happyDayRate: family.happyDayRate,
     };
   });

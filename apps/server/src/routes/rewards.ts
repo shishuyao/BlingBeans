@@ -5,7 +5,7 @@ import { authenticate, assertProfileAccess, requireParent } from '../auth.js';
 import { deductCost, getOrCreateBalance, toBeanDto } from '../beans.js';
 import { appendBeanLedger } from '../ledger.js';
 import { shanghaiToday } from '../dates.js';
-import { canAfford, SMALL_PER_BIG } from '@guoguo/shared';
+import { canAfford, isRedeemLocked, SMALL_PER_BIG } from '@guoguo/shared';
 
 export async function rewardRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate);
@@ -114,11 +114,10 @@ export async function rewardRoutes(app: FastifyInstance) {
       where: { id: reward.profileId },
       select: { dangerLocked: true },
     });
-    if (locked.dangerLocked) {
+    const balance = await getOrCreateBalance(reward.profileId);
+    if (isRedeemLocked(locked.dangerLocked, balance)) {
       return reply.status(400).send({ error: '危险模式中，先打卡攒够豆再兑奖', code: 'DANGER_LOCK' });
     }
-
-    const balance = await getOrCreateBalance(reward.profileId);
     if (!canAfford(balance, reward)) {
       return reply.status(400).send({ error: '豆豆不足' });
     }

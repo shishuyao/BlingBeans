@@ -14,6 +14,108 @@ type Props = {
   busy?: boolean;
 };
 
+function TagRows({
+  tags,
+  countMap,
+  quest,
+  variant,
+  hideActions,
+  busy,
+  onAdd,
+  onRemove,
+}: {
+  tags: BehaviorTagDto[];
+  countMap: Map<string, number>;
+  quest?: DayQuestDto | null;
+  variant: 'plus' | 'minus';
+  hideActions: boolean;
+  busy?: boolean;
+  onAdd: (tagId: string) => void;
+  onRemove: (tagId: string) => void;
+}) {
+  if (tags.length === 0) {
+    return (
+      <p className="empty-hint sheet-col-empty">
+        {variant === 'plus' ? '还没有加豆标签' : '还没有扣豆标签'}
+      </p>
+    );
+  }
+
+  return (
+    <div className="tag-list">
+      {tags.map((tag) => {
+        const count = countMap.get(tag.id) ?? 0;
+        const base = tag.beansOnComplete;
+        const minus = variant === 'minus';
+        const award = minus
+          ? base
+          : quest?.revealed
+            ? awardBeansForQuest(base, quest.kind, quest.multiplier)
+            : base;
+        const happyBoost = Boolean(
+          !minus && quest?.revealed && quest.kind === 'happy' && Number(quest.multiplier.toFixed(1)) !== 1,
+        );
+        return (
+          <div
+            key={tag.id}
+            className={`tag-row${minus ? ' minus' : ''}${count > 0 ? ' checked' : ''}`}
+            style={{ color: tag.color }}
+          >
+            {minus ? (
+              <span className="tag-bang" style={{ color: tag.color }} aria-hidden>
+                !
+              </span>
+            ) : (
+              <span className="tag-swatch" style={{ background: tag.color }} />
+            )}
+            <div className="tag-name">
+              {tag.name}
+              {count > 1 ? ` ×${count}` : ''}
+            </div>
+            {happyBoost ? (
+              <span className="tag-formula" title={`${base} × ${quest!.multiplier.toFixed(1)} ≈ ${award}`}>
+                <span className="tag-base">{base}</span>
+                <span className="tag-op">×</span>
+                <span className="tag-mult">{quest!.multiplier.toFixed(1)}</span>
+                <span className="tag-op">≈</span>
+                <span className="tag-award">+{award}</span>
+              </span>
+            ) : (
+              <span className="tag-meta">{minus ? `−${award}豆` : `+${award}豆`}</span>
+            )}
+            {!hideActions ? (
+              <div className="tag-actions">
+                <button
+                  type="button"
+                  className="mini-btn"
+                  disabled={busy || count === 0}
+                  onClick={() => onRemove(tag.id)}
+                  aria-label="减少一次"
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  className={`mini-btn plus${minus ? ' warn' : ''}`}
+                  disabled={busy}
+                  onClick={() => onAdd(tag.id)}
+                  aria-label={minus ? '扣豆' : '打卡'}
+                >
+                  +
+                </button>
+              </div>
+            ) : count > 0 ? (
+              <span className="tag-count">×{count}</span>
+            ) : (
+              <span className="tag-meta">{minus ? '未扣' : '未打卡'}</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function DayCheckInSheet({
   date,
   tags,
@@ -28,6 +130,8 @@ export function DayCheckInSheet({
   busy,
 }: Props) {
   const activeTags = tags.filter((t) => t.active);
+  const plusTags = activeTags.filter((t) => t.kind !== 'minus');
+  const minusTags = activeTags.filter((t) => t.kind === 'minus');
   const countMap = new Map(checkIns.filter((c) => c.date === date).map((c) => [c.tagId, c.count]));
   const [, , day] = date.split('-');
   const title = `${Number(date.slice(5, 7))}月${Number(day)}日打卡`;
@@ -39,9 +143,9 @@ export function DayCheckInSheet({
       return <div className="quest-banner happy">开心日 · 豆豆 ×{quest.multiplier.toFixed(1)}</div>;
     }
     if (quest.settled) {
-      return quest.beansEarned >= quest.dangerNeed ? (
+      return quest.beansAdded >= quest.dangerNeed ? (
         <div className="quest-banner danger ok">
-          危险日过关 · 集齐 {quest.beansEarned}/{quest.dangerNeed} 豆
+          危险日过关 · 今日加豆 {quest.beansAdded}/{quest.dangerNeed}
         </div>
       ) : (
         <div className="quest-banner danger">
@@ -51,7 +155,7 @@ export function DayCheckInSheet({
     }
     return (
       <div className="quest-banner danger">
-        危险日 · 今天要集齐 {quest.dangerNeed} 颗（已有 {quest.beansEarned}）
+        危险日 · 今天要加满 {quest.dangerNeed} 颗（已加 {quest.beansAdded}，兑奖不算）
       </div>
     );
   })();
@@ -59,7 +163,7 @@ export function DayCheckInSheet({
   return (
     <>
       <div className="sheet-backdrop" onClick={onClose} />
-      <div className="sheet" role="dialog" aria-label={title}>
+      <div className="sheet sheet-checkin" role="dialog" aria-label={title}>
         <h3>{title}</h3>
         {questBanner}
         {readOnly ? (
@@ -77,67 +181,33 @@ export function DayCheckInSheet({
         {activeTags.length === 0 ? (
           <p className="empty-hint">还没有行为标签，请先去「标签」页添加</p>
         ) : (
-          <div className="tag-list">
-            {activeTags.map((tag) => {
-              const count = countMap.get(tag.id) ?? 0;
-              const base = tag.beansOnComplete;
-              const award = quest?.revealed
-                ? awardBeansForQuest(base, quest.kind, quest.multiplier)
-                : base;
-              const happyBoost = Boolean(
-                quest?.revealed && quest.kind === 'happy' && Number(quest.multiplier.toFixed(1)) !== 1,
-              );
-              return (
-                <div
-                  key={tag.id}
-                  className={`tag-row${count > 0 ? ' checked' : ''}`}
-                  style={{ color: tag.color }}
-                >
-                  <span className="tag-swatch" style={{ background: tag.color }} />
-                  <div className="tag-name">
-                    {tag.name}
-                    {count > 1 ? ` ×${count}` : ''}
-                  </div>
-                  {happyBoost ? (
-                    <span className="tag-formula" title={`${base} × ${quest!.multiplier.toFixed(1)} ≈ ${award}`}>
-                      <span className="tag-base">{base}</span>
-                      <span className="tag-op">×</span>
-                      <span className="tag-mult">{quest!.multiplier.toFixed(1)}</span>
-                      <span className="tag-op">≈</span>
-                      <span className="tag-award">+{award}</span>
-                    </span>
-                  ) : (
-                    <span className="tag-meta">+{award}豆</span>
-                  )}
-                  {!hideActions ? (
-                    <div className="tag-actions">
-                      <button
-                        type="button"
-                        className="mini-btn"
-                        disabled={busy || count === 0}
-                        onClick={() => onRemove(tag.id)}
-                        aria-label="减少一次"
-                      >
-                        −
-                      </button>
-                      <button
-                        type="button"
-                        className="mini-btn plus"
-                        disabled={busy}
-                        onClick={() => onAdd(tag.id)}
-                        aria-label="打卡"
-                      >
-                        +
-                      </button>
-                    </div>
-                  ) : count > 0 ? (
-                    <span className="tag-count">×{count}</span>
-                  ) : (
-                    <span className="tag-meta">未打卡</span>
-                  )}
-                </div>
-              );
-            })}
+          <div className="sheet-split">
+            <section className="sheet-col plus">
+              <h4>加豆</h4>
+              <TagRows
+                tags={plusTags}
+                countMap={countMap}
+                quest={quest}
+                variant="plus"
+                hideActions={hideActions}
+                busy={busy}
+                onAdd={onAdd}
+                onRemove={onRemove}
+              />
+            </section>
+            <section className="sheet-col minus">
+              <h4>扣豆</h4>
+              <TagRows
+                tags={minusTags}
+                countMap={countMap}
+                quest={quest}
+                variant="minus"
+                hideActions={hideActions}
+                busy={busy}
+                onAdd={onAdd}
+                onRemove={onRemove}
+              />
+            </section>
           </div>
         )}
         <button type="button" className="btn btn-ghost" style={{ width: '100%', marginTop: 14 }} onClick={onClose}>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { TAG_COLORS, type BehaviorTagDto } from '@guoguo/shared';
+import { PENALTY_COLORS, TAG_COLORS, type BehaviorTagDto, type TagKind } from '@guoguo/shared';
 import { api } from '../api';
 import { useApp } from '../appContext';
 
@@ -9,6 +9,7 @@ export function TagsPanel() {
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>(TAG_COLORS[0]);
   const [beans, setBeans] = useState(1);
+  const [kind, setKind] = useState<TagKind>('plus');
   const [editing, setEditing] = useState<BehaviorTagDto | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
@@ -31,18 +32,22 @@ export function TagsPanel() {
     return () => window.clearTimeout(t);
   }, [showForm]);
 
+  const palette = kind === 'minus' ? PENALTY_COLORS : TAG_COLORS;
+
   const closeForm = () => {
     setName('');
     setColor(TAG_COLORS[0]);
     setBeans(1);
+    setKind('plus');
     setEditing(null);
     setShowForm(false);
     setError('');
   };
 
-  const openCreate = () => {
+  const openCreate = (nextKind: TagKind) => {
     setName('');
-    setColor(TAG_COLORS[0]);
+    setKind(nextKind);
+    setColor(nextKind === 'minus' ? PENALTY_COLORS[0] : TAG_COLORS[0]);
     setBeans(1);
     setEditing(null);
     setError('');
@@ -51,6 +56,7 @@ export function TagsPanel() {
 
   const openEdit = (tag: BehaviorTagDto) => {
     setEditing(tag);
+    setKind(tag.kind === 'minus' ? 'minus' : 'plus');
     setName(tag.name);
     setColor(tag.color);
     setBeans(tag.beansOnComplete);
@@ -61,7 +67,7 @@ export function TagsPanel() {
   const submit = async () => {
     if (!profileId || !name.trim()) return;
     if (beans < 1) {
-      setError('达标豆豆数至少为 1');
+      setError(kind === 'minus' ? '扣豆数至少为 1' : '达标豆豆数至少为 1');
       return;
     }
     setLoading(true);
@@ -79,6 +85,7 @@ export function TagsPanel() {
           name: name.trim(),
           color,
           beansOnComplete: beans,
+          kind,
         });
       }
       closeForm();
@@ -97,45 +104,79 @@ export function TagsPanel() {
     await load();
   };
 
-  const colors = TAG_COLORS.includes(color as (typeof TAG_COLORS)[number])
-    ? TAG_COLORS
-    : ([color, ...TAG_COLORS] as string[]);
+  const colors = (palette as readonly string[]).includes(color)
+    ? palette
+    : ([color, ...palette] as string[]);
+
+  const plusTags = tags.filter((t) => t.kind !== 'minus');
+  const minusTags = tags.filter((t) => t.kind === 'minus');
+  const formTitle = editing
+    ? kind === 'minus'
+      ? '编辑扣豆标签'
+      : '编辑加豆标签'
+    : kind === 'minus'
+      ? '新增扣豆标签'
+      : '新增加豆标签';
+
+  const renderList = (list: BehaviorTagDto[], variant: TagKind) => (
+    <div className="manage-list">
+      {list.length === 0 ? (
+        <p className="empty-hint">{variant === 'plus' ? '暂无加豆标签' : '暂无扣豆标签'}</p>
+      ) : null}
+      {list.map((tag) => (
+        <div key={tag.id} className="manage-item">
+          {variant === 'minus' ? (
+            <span className="tag-bang" style={{ color: tag.color }} aria-hidden>
+              !
+            </span>
+          ) : (
+            <span className="tag-swatch" style={{ background: tag.color }} />
+          )}
+          <div className="info">
+            <div className="title">{tag.name}</div>
+            <div className="sub">
+              {variant === 'minus' ? `一次 −${tag.beansOnComplete} 小豆` : `达标 +${tag.beansOnComplete} 小豆`}
+            </div>
+          </div>
+          <button type="button" className="btn btn-ghost" onClick={() => openEdit(tag)}>
+            编辑
+          </button>
+          <button type="button" className="btn btn-danger" onClick={() => remove(tag)}>
+            删
+          </button>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div>
-      <div className="form-inline" style={{ marginBottom: 12 }}>
-        <button type="button" className="btn btn-primary" onClick={openCreate}>
-          ＋ 新增
-        </button>
-      </div>
-
-      <div className="panel">
-        <h3>当前标签</h3>
-        <div className="manage-list">
-          {tags.length === 0 ? <p className="empty-hint">暂无标签，点上方新增</p> : null}
-          {tags.map((tag) => (
-            <div key={tag.id} className="manage-item">
-              <span className="tag-swatch" style={{ background: tag.color }} />
-              <div className="info">
-                <div className="title">{tag.name}</div>
-                <div className="sub">达标 +{tag.beansOnComplete} 小豆</div>
-              </div>
-              <button type="button" className="btn btn-ghost" onClick={() => openEdit(tag)}>
-                编辑
-              </button>
-              <button type="button" className="btn btn-danger" onClick={() => remove(tag)}>
-                删
-              </button>
-            </div>
-          ))}
+      <div className="tag-manage-split">
+        <div className="panel">
+          <div className="tag-manage-head">
+            <h3>加豆标签</h3>
+            <button type="button" className="btn btn-primary" onClick={() => openCreate('plus')}>
+              ＋ 新增
+            </button>
+          </div>
+          {renderList(plusTags, 'plus')}
+        </div>
+        <div className="panel tag-manage-minus">
+          <div className="tag-manage-head">
+            <h3>扣豆标签</h3>
+            <button type="button" className="btn btn-danger" onClick={() => openCreate('minus')}>
+              ＋ 新增
+            </button>
+          </div>
+          {renderList(minusTags, 'minus')}
         </div>
       </div>
 
       {showForm ? (
         <>
           <div className="sheet-backdrop" onClick={closeForm} />
-          <div className="sheet" role="dialog" aria-label={editing ? '编辑标签' : '新增标签'}>
-            <h3>{editing ? '编辑标签' : '新增标签'}</h3>
+          <div className="sheet" role="dialog" aria-label={formTitle}>
+            <h3>{formTitle}</h3>
             {error ? <div className="error-banner">{error}</div> : null}
             <div className="form-row">
               <label>名称</label>
@@ -143,7 +184,7 @@ export function TagsPanel() {
                 ref={nameRef}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="例如：礼貌交友"
+                placeholder={kind === 'minus' ? '例如：发脾气' : '例如：礼貌交友'}
               />
             </div>
             <div className="form-row">
@@ -162,7 +203,7 @@ export function TagsPanel() {
               </div>
             </div>
             <div className="form-row">
-              <label>达标豆豆数</label>
+              <label>{kind === 'minus' ? '一次扣豆数' : '达标豆豆数'}</label>
               <input
                 type="number"
                 min={0}

@@ -1,12 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { awardBeansForQuest } from '@guoguo/shared';
+import { beansDeltaForTag } from '@guoguo/shared';
 import { prisma } from '../db.js';
 import { authenticate, assertProfileAccess, requireParent } from '../auth.js';
-import { addBeans, removeBeans, toBeanDto } from '../beans.js';
+import { addBeans, removeBeans, removeBeansAllowDebt, toBeanDto } from '../beans.js';
 import { appendBeanLedger } from '../ledger.js';
 import { shanghaiToday } from '../dates.js';
-import { ensureQuest } from '../quests.js';
+import { ensureQuest, addedBeansOnDate } from '../quests.js';
 
 function dateGuardMessage(date: string, today: string) {
   if (date > today) return '这一天还没到';
@@ -62,7 +62,7 @@ export async function checkInRoutes(app: FastifyInstance) {
 
     const quest = await ensureQuest(body.profileId, body.date);
     const kind = quest.kind === 'danger' ? 'danger' : 'happy';
-    const award = awardBeansForQuest(tag.beansOnComplete, kind, quest.multiplier);
+    const award = beansDeltaForTag(tag, kind, quest.multiplier);
     const justRevealed = !quest.revealed;
 
     const existing = await prisma.checkIn.findUnique({
@@ -104,22 +104,29 @@ export async function checkInRoutes(app: FastifyInstance) {
       },
     });
 
-    const beanResult = await addBeans(body.profileId, award, tag.color, tag.id);
+    let beanResult = { mergeEvents: [] as { fromSmall: number; toBig: number; colors: string[] }[] };
+    if (award > 0) {
+      beanResult = await addBeans(body.profileId, award, tag.color, tag.id);
+    } else if (award < 0) {
+      await removeBeansAllowDebt(body.profileId, -award);
+    }
     await appendBeanLedger({
       profileId: body.profileId,
       amount: award,
-      reason: 'checkin',
+      reason: tag.kind === 'minus' ? 'penalty' : 'checkin',
       date: body.date,
       tagId: tag.id,
       checkInId: checkIn.id,
     });
+
+    const beansAdded = await addedBeansOnDate(body.profileId, body.date);
 
     let dangerUnlocked = false;
     const fresh = await prisma.profile.findUniqueOrThrow({
       where: { id: body.profileId },
       select: { dangerLocked: true },
     });
-    if (fresh.dangerLocked && nextEarned > 5) {
+    if (fresh.dangerLocked && beansAdded > 5) {
       await prisma.profile.update({
         where: { id: body.profileId },
         data: { dangerLocked: false },
@@ -139,6 +146,7 @@ export async function checkInRoutes(app: FastifyInstance) {
         revealed: true,
         settled: quest.settled,
         beansEarned: nextEarned,
+        beansAdded,
       },
       reveal: justRevealed
         ? {
@@ -182,10 +190,14 @@ export async function checkInRoutes(app: FastifyInstance) {
 
     const quest = await ensureQuest(body.profileId, body.date);
     const kind = quest.kind === 'danger' ? 'danger' : 'happy';
-    const beansToRemove = awardBeansForQuest(existing.tag.beansOnComplete, kind, quest.multiplier);
-    const beanResult = await removeBeans(body.profileId, beansToRemove);
-    if (!beanResult) {
-      return reply.status(400).send({ error: '豆豆不足，无法撤销（可能已用于兑换）' });
+    const perTap = beansDeltaForTag(existing.tag, kind, quest.multiplier);
+    if (perTap > 0) {
+      const beanResult = await removeBeans(body.profileId, perTap);
+      if (!beanResult) {
+        return reply.status(400).send({ error: '豆豆不足，无法撤销（可能已用于兑换）' });
+      }
+    } else if (perTap < 0) {
+      await addBeans(body.profileId, -perTap, existing.tag.color, existing.tag.id);
     }
 
     let checkIn = null;
@@ -196,7 +208,7 @@ export async function checkInRoutes(app: FastifyInstance) {
         where: { id: existing.id },
         data: {
           count: { decrement: 1 },
-          beansAwarded: Math.max(0, existing.beansAwarded - beansToRemove),
+          beansAwarded: existing.beansAwarded - perTap,
         },
         include: { tag: true },
       });
@@ -204,12 +216,12 @@ export async function checkInRoutes(app: FastifyInstance) {
 
     await prisma.dayQuest.update({
       where: { id: quest.id },
-      data: { beansEarned: Math.max(0, quest.beansEarned - beansToRemove) },
+      data: { beansEarned: quest.beansEarned - perTap },
     });
     await appendBeanLedger({
       profileId: body.profileId,
-      amount: -beansToRemove,
-      reason: 'undo',
+      amount: -perTap,
+      reason: existing.tag.kind === 'minus' ? 'penalty_undo' : 'undo',
       date: body.date,
       tagId: existing.tagId,
       checkInId: existing.id,

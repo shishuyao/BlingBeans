@@ -106,8 +106,13 @@ export const api = {
 
   tags: {
     list: (profileId: string) => request<BehaviorTagDto[]>(`/api/tags?profileId=${profileId}`),
-    create: (body: { profileId: string; name: string; color: string; beansOnComplete: number }) =>
-      request<BehaviorTagDto>('/api/tags', { method: 'POST', body: JSON.stringify(body) }),
+    create: (body: {
+      profileId: string;
+      name: string;
+      color: string;
+      beansOnComplete: number;
+      kind?: 'plus' | 'minus';
+    }) => request<BehaviorTagDto>('/api/tags', { method: 'POST', body: JSON.stringify(body) }),
     update: (id: string, body: Partial<BehaviorTagDto>) =>
       request<BehaviorTagDto>(`/api/tags/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     remove: (id: string) => request<{ ok: boolean }>(`/api/tags/${id}`, { method: 'DELETE' }),

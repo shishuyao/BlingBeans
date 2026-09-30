@@ -46,7 +46,9 @@ export async function summaryRoutes(app: FastifyInstance) {
     const tagMap = new Map<string, { tagId: string; name: string; color: string; count: number }>();
     let totalSmallEarned = 0;
     for (const c of checkIns) {
-      totalSmallEarned += c.beansAwarded > 0 ? c.beansAwarded : c.tag.beansOnComplete * c.count;
+      if (c.beansAwarded !== 0) totalSmallEarned += c.beansAwarded;
+      else if (c.tag.kind === 'minus') totalSmallEarned -= c.tag.beansOnComplete * c.count;
+      else totalSmallEarned += c.tag.beansOnComplete * c.count;
       const prev = tagMap.get(c.tagId);
       if (prev) {
         prev.count += c.count;

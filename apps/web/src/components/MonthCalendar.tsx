@@ -21,12 +21,10 @@ function footer(opts: { mystery: boolean; isFuture: boolean; quest?: DayQuestDto
   const q = opts.quest;
   if (!q) return '';
   if (q.kind === 'happy') {
-    return q.beansEarned > 0 ? `${q.beansEarned}豆` : '';
+    if (q.beansEarned !== 0) return `${q.beansEarned}豆`;
+    return '';
   }
-  if (q.settled) {
-    return q.beansEarned >= q.dangerNeed ? `过关 ${q.beansEarned}豆` : `−${q.dangerNeed}`;
-  }
-  return `需满${q.dangerNeed}`;
+  return `${q.beansAdded}/${q.dangerNeed}`;
 }
 
 export function MonthCalendar({ quests, onSelectDay }: Props) {
@@ -63,6 +61,7 @@ export function MonthCalendar({ quests, onSelectDay }: Props) {
           ›
         </button>
       </div>
+      <div className="cal-board">
       <div className="weekday-row">
         {WEEKDAYS.map((w) => (
           <div key={w} className="weekday">
@@ -79,6 +78,12 @@ export function MonthCalendar({ quests, onSelectDay }: Props) {
           const isFuture = date > today;
           const revealed = Boolean(quest?.revealed);
           const mystery = isFuture || !revealed;
+          const dangerSafe = Boolean(
+            revealed && quest?.kind === 'danger' && quest.beansAdded >= quest.dangerNeed,
+          );
+          const dangerFailed = Boolean(
+            revealed && quest?.kind === 'danger' && quest.settled && quest.beansAdded < quest.dangerNeed,
+          );
           const classes = [
             'day-cell',
             isToday ? 'today' : '',
@@ -87,12 +92,8 @@ export function MonthCalendar({ quests, onSelectDay }: Props) {
             isFuture ? 'future' : '',
             revealed && quest?.kind === 'happy' ? 'quest-happy' : '',
             revealed && quest?.kind === 'danger' ? 'quest-danger' : '',
-            revealed && quest?.kind === 'danger' && quest.settled && quest.beansEarned < quest.dangerNeed
-              ? 'failed'
-              : '',
-            revealed && quest?.kind === 'danger' && quest.settled && quest.beansEarned >= quest.dangerNeed
-              ? 'passed'
-              : '',
+            dangerFailed ? 'failed' : '',
+            dangerSafe ? 'safe' : '',
           ]
             .filter(Boolean)
             .join(' ');
@@ -115,6 +116,9 @@ export function MonthCalendar({ quests, onSelectDay }: Props) {
                 {revealed && quest?.kind === 'happy' ? (
                   <span className="day-mult">×{quest.multiplier.toFixed(1)}</span>
                 ) : null}
+                {revealed && quest?.kind === 'danger' ? (
+                  <span className="day-need">{quest.dangerNeed}</span>
+                ) : null}
               </span>
               <span className={`day-caption${mystery ? '' : quest?.kind === 'danger' ? ' danger' : ' happy'}`}>
                 {footer({ mystery, isFuture, quest })}
@@ -122,6 +126,7 @@ export function MonthCalendar({ quests, onSelectDay }: Props) {
             </button>
           );
         })}
+      </div>
       </div>
     </div>
   );

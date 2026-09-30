@@ -24,20 +24,29 @@ export function BeanProgressBar() {
         <CartoonBean color="#F5C518" variant="big" size={64} face={danger ? 'wink' : 'sparkle'} className="big-bean-svg" />
         <span className="big-count">×{beans.bigBeans}</span>
       </div>
-      <div className="small-track" aria-label={`小豆豆 ${beans.smallBeans}/10`}>
-        {slots.map((color, i) => (
-          <div key={i} className="small-slot">
-            {color ? (
-              <CartoonBean
-                color={color}
-                variant="small"
-                size="92%"
-                face={i % 3 === 0 ? 'wink' : 'happy'}
-                className="small-bean-svg"
-              />
-            ) : null}
-          </div>
-        ))}
+      <div
+        className="small-track"
+        aria-label={
+          beans.smallBeans < 0 ? `欠 ${Math.abs(beans.smallBeans)} 豆` : `小豆豆 ${beans.smallBeans}/10`
+        }
+      >
+        {beans.smallBeans < 0 ? (
+          <div className="debt-label">欠 {Math.abs(beans.smallBeans)} 豆</div>
+        ) : (
+          slots.map((color, i) => (
+            <div key={i} className="small-slot">
+              {color ? (
+                <CartoonBean
+                  color={color}
+                  variant="small"
+                  size="92%"
+                  face={i % 3 === 0 ? 'wink' : 'happy'}
+                  className="small-bean-svg"
+                />
+              ) : null}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

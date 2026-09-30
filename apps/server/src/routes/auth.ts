@@ -2,8 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../db.js';
-import { DEFAULT_TAGS, TAG_COLORS } from '@guoguo/shared';
+import { TAG_COLORS } from '@guoguo/shared';
 import { authenticate, getParentStatus, setParentCookie, clearParentCookie } from '../auth.js';
+import { defaultTagRows } from '../defaultTags.js';
 
 export async function authRoutes(app: FastifyInstance) {
   app.post('/register', async (request, reply) => {
@@ -44,13 +45,7 @@ export async function authRoutes(app: FastifyInstance) {
       });
       await tx.beanBalance.create({ data: { profileId: profile.id } });
       await tx.behaviorTag.createMany({
-        data: DEFAULT_TAGS.map((t, i) => ({
-          profileId: profile.id,
-          name: t.name,
-          color: t.color,
-          beansOnComplete: t.beansOnComplete,
-          sortOrder: i,
-        })),
+        data: defaultTagRows(profile.id),
       });
       return { user, family, profile };
     });

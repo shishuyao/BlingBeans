@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { authenticate, assertProfileAccess, requireParent } from '../auth.js';
+import { DEFAULT_PENALTY_TAGS } from '@guoguo/shared';
 
 export async function tagRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate);
@@ -10,6 +11,23 @@ export async function tagRoutes(app: FastifyInstance) {
     const query = z.object({ profileId: z.string() }).parse(request.query);
     const profile = await assertProfileAccess(request.user.id, query.profileId);
     if (!profile) return reply.status(404).send({ error: '档案不存在' });
+
+    const minusCount = await prisma.behaviorTag.count({
+      where: { profileId: query.profileId, kind: 'minus' },
+    });
+    if (minusCount === 0) {
+      const count = await prisma.behaviorTag.count({ where: { profileId: query.profileId } });
+      await prisma.behaviorTag.createMany({
+        data: DEFAULT_PENALTY_TAGS.map((t, i) => ({
+          profileId: query.profileId,
+          name: t.name,
+          color: t.color,
+          beansOnComplete: t.beansOnComplete,
+          sortOrder: count + i,
+          kind: 'minus',
+        })),
+      });
+    }
 
     const tags = await prisma.behaviorTag.findMany({
       where: { profileId: query.profileId },
@@ -25,6 +43,7 @@ export async function tagRoutes(app: FastifyInstance) {
         name: z.string().min(1),
         color: z.string().min(1),
         beansOnComplete: z.number().int().min(1).max(20).default(1),
+        kind: z.enum(['plus', 'minus']).default('plus'),
       })
       .parse(request.body);
 
@@ -39,6 +58,7 @@ export async function tagRoutes(app: FastifyInstance) {
         color: body.color,
         beansOnComplete: body.beansOnComplete,
         sortOrder: count,
+        kind: body.kind,
       },
     });
     return reply.status(201).send(tag);

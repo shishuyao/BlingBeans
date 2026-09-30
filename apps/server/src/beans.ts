@@ -1,5 +1,5 @@
 import { prisma } from './db.js';
-import { SMALL_PER_BIG, type MergeEvent } from '@guoguo/shared';
+import { isDebtLocked, SMALL_PER_BIG, totalSmallBeans, type MergeEvent } from '@guoguo/shared';
 
 export async function getOrCreateBalance(profileId: string) {
   let balance = await prisma.beanBalance.findUnique({ where: { profileId } });
@@ -26,6 +26,28 @@ export async function addBeans(
   tagId: string | null
 ): Promise<{ smallBeans: number; bigBeans: number; mergeEvents: MergeEvent[]; slotColors: string[] }> {
   await getOrCreateBalance(profileId);
+  const existing = await prisma.beanBalance.findUniqueOrThrow({ where: { profileId } });
+  const owed = totalSmallBeans(existing);
+  if (owed < 0) {
+    const next = owed + amount;
+    if (next <= 0) {
+      const balance = await prisma.beanBalance.update({
+        where: { profileId },
+        data: { smallBeans: next, bigBeans: 0 },
+      });
+      return {
+        smallBeans: balance.smallBeans,
+        bigBeans: balance.bigBeans,
+        mergeEvents: [],
+        slotColors: [],
+      };
+    }
+    await prisma.beanBalance.update({
+      where: { profileId },
+      data: { smallBeans: 0, bigBeans: 0 },
+    });
+    amount = next;
+  }
 
   const mergeEvents: MergeEvent[] = [];
 
@@ -131,6 +153,44 @@ export async function removeBeans(
   };
 }
 
+/** Deduct beans and allow the balance to go negative (used by penalty tags). */
+export async function removeBeansAllowDebt(
+  profileId: string,
+  amount: number
+): Promise<{ smallBeans: number; bigBeans: number; slotColors: string[] }> {
+  const take = Math.max(0, amount);
+  if (take <= 0) {
+    const balance = await getOrCreateBalance(profileId);
+    return {
+      smallBeans: balance.smallBeans,
+      bigBeans: balance.bigBeans,
+      slotColors: await getSlotColors(profileId),
+    };
+  }
+
+  const balance = await getOrCreateBalance(profileId);
+  const total = totalSmallBeans(balance);
+  if (total >= take) {
+    const result = await removeBeans(profileId, take);
+    if (result) return result;
+  }
+
+  if (total > 0) {
+    await removeBeans(profileId, total);
+  }
+
+  const next = total - take;
+  const updated = await prisma.beanBalance.update({
+    where: { profileId },
+    data: { smallBeans: next, bigBeans: 0 },
+  });
+  return {
+    smallBeans: updated.smallBeans,
+    bigBeans: updated.bigBeans,
+    slotColors: [],
+  };
+}
+
 export async function deductCost(
   profileId: string,
   costSmall: number,
@@ -175,10 +235,12 @@ export async function toBeanDto(profileId: string) {
     where: { id: profileId },
     select: { dangerLocked: true },
   });
+  const debtLocked = isDebtLocked(totalSmallBeans(balance));
   return {
     smallBeans: balance.smallBeans,
     bigBeans: balance.bigBeans,
     slotColors,
-    dangerLocked: profile.dangerLocked,
+    dangerLocked: profile.dangerLocked || debtLocked,
+    debtLocked,
   };
 }

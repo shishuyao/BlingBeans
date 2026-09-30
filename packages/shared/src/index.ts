@@ -20,6 +20,43 @@ export const TAG_COLORS = [
   '#FFC107',
 ] as const;
 
+export const PENALTY_COLORS = [
+  '#E53935',
+  '#FB8C00',
+  '#F9A825',
+  '#D84315',
+  '#C62828',
+  '#EF6C00',
+  '#FF7043',
+  '#BF360C',
+] as const;
+
+export const DEFAULT_PENALTY_TAGS = [
+  { name: '发脾气', color: '#E53935', beansOnComplete: 2 },
+  { name: '不听话', color: '#FB8C00', beansOnComplete: 1 },
+  { name: '没礼貌', color: '#F9A825', beansOnComplete: 1 },
+] as const;
+
+export type TagKind = 'plus' | 'minus';
+
+/** Lock the bean bar / redeem when remaining small-equivalent is this or worse. */
+export const DEBT_LOCK_THRESHOLD = -5;
+
+export function totalSmallBeans(balance: { smallBeans: number; bigBeans: number }): number {
+  return balance.smallBeans + balance.bigBeans * SMALL_PER_BIG;
+}
+
+export function isDebtLocked(totalSmall: number): boolean {
+  return totalSmall <= DEBT_LOCK_THRESHOLD;
+}
+
+export function isRedeemLocked(
+  dangerLocked: boolean,
+  balance: { smallBeans: number; bigBeans: number },
+): boolean {
+  return dangerLocked || isDebtLocked(totalSmallBeans(balance));
+}
+
 export type BehaviorTagDto = {
   id: string;
   profileId: string;
@@ -28,6 +65,7 @@ export type BehaviorTagDto = {
   beansOnComplete: number;
   sortOrder: number;
   active: boolean;
+  kind: TagKind;
 };
 
 export type CheckInDto = {
@@ -47,6 +85,7 @@ export type BeanBalanceDto = {
   /** Colors filling the current 10-slot progress (left to right) */
   slotColors: string[];
   dangerLocked: boolean;
+  debtLocked: boolean;
 };
 
 export type DayQuestKind = 'happy' | 'danger';
@@ -58,7 +97,10 @@ export type DayQuestDto = {
   dangerNeed: number;
   revealed: boolean;
   settled: boolean;
+  /** Net of plus and minus tags that day (not redemptions). */
   beansEarned: number;
+  /** Plus-tag gains only; used for danger-day fill. Redemptions do not count. */
+  beansAdded: number;
 };
 
 export type RevealEvent = {
@@ -79,6 +121,16 @@ export type QuestsMonthDto = {
 export function awardBeansForQuest(base: number, kind: DayQuestKind, multiplier: number): number {
   if (kind === 'happy') return Math.max(1, Math.round(base * multiplier));
   return Math.max(1, base);
+}
+
+/** Plus tags follow the quest multiplier; minus tags are always face value (negative). */
+export function beansDeltaForTag(
+  tag: { kind: TagKind | string; beansOnComplete: number },
+  questKind: DayQuestKind,
+  multiplier: number,
+): number {
+  if (tag.kind === 'minus') return -Math.max(1, tag.beansOnComplete);
+  return awardBeansForQuest(tag.beansOnComplete, questKind, multiplier);
 }
 
 export type MergeEvent = {

@@ -2,7 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { authenticate, assertProfileAccess, requireParent } from '../auth.js';
-import { TAG_COLORS, DEFAULT_TAGS } from '@guoguo/shared';
+import { TAG_COLORS } from '@guoguo/shared';
+import { defaultTagRows } from '../defaultTags.js';
 
 export async function profileRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate);
@@ -40,13 +41,7 @@ export async function profileRoutes(app: FastifyInstance) {
       await tx.beanBalance.create({ data: { profileId: p.id } });
       if (body.seedDefaultTags !== false) {
         await tx.behaviorTag.createMany({
-          data: DEFAULT_TAGS.map((t, i) => ({
-            profileId: p.id,
-            name: t.name,
-            color: t.color,
-            beansOnComplete: t.beansOnComplete,
-            sortOrder: i,
-          })),
+          data: defaultTagRows(p.id),
         });
       }
       return p;
