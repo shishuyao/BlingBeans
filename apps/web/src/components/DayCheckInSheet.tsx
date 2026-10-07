@@ -1,4 +1,10 @@
-import { awardBeansForQuest, type BehaviorTagDto, type CheckInDto, type DayQuestDto } from '@guoguo/shared';
+import {
+  awardBeansForQuest,
+  isMissedCheckInTag,
+  type BehaviorTagDto,
+  type CheckInDto,
+  type DayQuestDto,
+} from '@guoguo/shared';
 
 type Props = {
   date: string;
@@ -131,7 +137,7 @@ export function DayCheckInSheet({
 }: Props) {
   const activeTags = tags.filter((t) => t.active);
   const plusTags = activeTags.filter((t) => t.kind !== 'minus');
-  const minusTags = activeTags.filter((t) => t.kind === 'minus');
+  const minusTags = activeTags.filter((t) => t.kind === 'minus' && !isMissedCheckInTag(t));
   const countMap = new Map(checkIns.filter((c) => c.date === date).map((c) => [c.tagId, c.count]));
   const [, , day] = date.split('-');
   const title = `${Number(date.slice(5, 7))}月${Number(day)}日打卡`;

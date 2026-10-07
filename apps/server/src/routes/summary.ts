@@ -17,7 +17,7 @@ export async function summaryRoutes(app: FastifyInstance) {
     const profile = await assertProfileAccess(request.user.id, query.profileId);
     if (!profile) return reply.status(404).send({ error: '档案不存在' });
 
-    const [checkIns, redemptions] = await Promise.all([
+    const [checkIns, redemptions, missedDays] = await Promise.all([
       prisma.checkIn.findMany({
         where: {
           profileId: query.profileId,
@@ -41,6 +41,14 @@ export async function summaryRoutes(app: FastifyInstance) {
         include: { reward: true },
         orderBy: { redeemedAt: 'asc' },
       }),
+      prisma.missedDaySettle.findMany({
+        where: {
+          profileId: query.profileId,
+          date: { startsWith: query.month },
+          deducted: { gt: 0 },
+        },
+        orderBy: { date: 'asc' },
+      }),
     ]);
 
     const tagMap = new Map<string, { tagId: string; name: string; color: string; count: number }>();
@@ -60,6 +68,16 @@ export async function summaryRoutes(app: FastifyInstance) {
           count: c.count,
         });
       }
+    }
+    if (missedDays.length) {
+      const deducted = missedDays.reduce((sum, row) => sum + row.deducted, 0);
+      totalSmallEarned -= deducted;
+      tagMap.set('missed_day', {
+        tagId: 'missed_day',
+        name: '未打卡扣豆',
+        color: '#6B1020',
+        count: missedDays.length,
+      });
     }
 
     return {

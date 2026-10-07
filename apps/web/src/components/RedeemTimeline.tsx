@@ -107,6 +107,11 @@ export function RedeemTimeline({ redemptions, emptyHint = '还没有兑换记录
 
 function galleryTitle(items: RedemptionDto[]) {
   if (items.length === 0) return '兑换相册';
+  const names = new Set(items.map((row) => row.reward?.title ?? '奖励'));
+  if (names.size === 1) {
+    const [name] = names;
+    return items.length > 1 ? `${name} · ${items.length} 次` : name;
+  }
   const keys = new Set(items.map((row) => formatDate(new Date(row.redeemedAt))));
   if (keys.size === 1) {
     const [only] = keys;

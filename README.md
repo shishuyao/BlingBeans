@@ -16,10 +16,36 @@ npm run dev:server
 npm run dev:web
 ```
 
-- 前端：http://localhost:5180  
-- API：http://localhost:3001  
+- 前端：[http://localhost:5180](http://localhost:5180)  
+- API：[http://localhost:3001](http://localhost:3001)
 
 在同一局域网 Android 设备上访问电脑的 `http://<电脑IP>:5180` 即可。
+
+开发调试才需要上面两个终端。家里平时用下面的「开启服务」，不要和 `npm run dev:server` 一起开，否则会抢 3001 端口。
+
+## 开启服务
+
+家里用的是打包后的服务：网页和接口都在 **3001**，数据是 `apps/server/.env` 里的库（当前为 `apps/server/prisma/dev.db`）。
+
+开机登录后约 20 秒会自动开（计划任务名 `Guoguo`）。没开起来，或改完代码要重新开，在项目根目录执行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-guoguo.ps1
+```
+
+脚本会做这些事：
+
+- 源码比现有打包新时，先更新数据库结构并重新构建，再停掉旧的打包进程
+- 启动 `apps/server/dist/index.js`
+- 3001 已经有别的程序占用时（例如另一个 `npm run dev:server`），这次启动会跳过
+
+浏览器打开 [http://localhost:3001](http://localhost:3001)。手机同一 Wi-Fi 下打开 `http://<电脑IP>:3001`。
+
+日志在 `logs/guoguo.log`。换了电脑或计划任务丢了，再注册一次开机自启：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-autostart.ps1
+```
 
 ## 功能
 
@@ -32,10 +58,16 @@ npm run dev:web
 
 ## 功能迭代
 
+### 2026-10-07
+
+- **未打卡扣豆**：第一次打卡之后，已经过去却没打卡的日子自动扣豆。扣豆标签里有一条深红色、不能删除的「未打卡扣豆」，默认为 10 小豆（1 大豆），改成 0 则不生效。扣完手里的豆还不够时，扣到 0 并进入危险模式。
+
 ### 2026-09-30
 
 - **扣豆标签**：打卡弹层左加豆、右扣豆；扣豆不乘开心日倍率；余额 ≤ -5 时豆条锁定（与危险日同一套）。详见 [docs/iterations/2026-09-30-扣豆标签.md](docs/iterations/2026-09-30-扣豆标签.md)。
 - **危险日历**：字号加大、窄屏可左右滑；危险日中间显示门槛、底部 `已加/门槛`；达标浅绿，凌晨未加满则锁定并略加深红。需满只计加豆，兑奖不算。详见 [docs/iterations/2026-09-30-危险日历.md](docs/iterations/2026-09-30-危险日历.md)。
+
+
 
 ### 2026-09-29
 
@@ -49,11 +81,14 @@ npm run dev:web
 - 标签新增/编辑改为底部弹层；豆数输入清空时视为 0，提交最少 1。
 - 减少豆豆也有音效；暗色模式下卡通豆去掉会糊成黑块的投影。
 
-## 生产构建
+
+
+## 手动打包
+
+启动脚本在源码更新时也会做同样的事。需要单独打包时：
 
 ```bash
 npm run build
-cd apps/server && DATABASE_URL="file:./prod.db" npm start
 ```
 
-服务端会托管 `apps/web/dist` 静态资源。
+服务端会托管 `apps/web/dist`。不要改用另一个数据库文件来启动，否则打卡记录会对不上现在这份 `dev.db`。

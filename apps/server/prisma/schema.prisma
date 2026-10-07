@@ -55,6 +55,7 @@ model Profile {
   beanSlots    BeanSlot[]
   dayQuests    DayQuest[]
   beanLedgers  BeanLedger[]
+  missedDays   MissedDaySettle[]
 }
 
 model BehaviorTag {
@@ -67,9 +68,14 @@ model BehaviorTag {
   active          Boolean   @default(true)
   /// plus = earn beans; minus = deduct beans (no happy-day multiplier)
   kind            String    @default("plus")
+  /// Built-in tag id. "missed_day" is the undeletable skipped-day penalty.
+  systemKey       String?
   profile         Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
   checkIns        CheckIn[]
   beanSlots       BeanSlot[]
+
+  @@unique([profileId, systemKey])
+  @@index([profileId, systemKey])
 }
 
 model CheckIn {
@@ -85,6 +91,20 @@ model CheckIn {
   tag          BehaviorTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([profileId, tagId, date])
+  @@index([profileId, date])
+}
+
+/// One row per calendar day that was closed by the missed-check-in rule.
+model MissedDaySettle {
+  id        String   @id @default(cuid())
+  profileId String
+  date      String
+  deducted  Int      @default(0)
+  frozen    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, date])
   @@index([profileId, date])
 }
 

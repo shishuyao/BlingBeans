@@ -37,6 +37,19 @@ export const DEFAULT_PENALTY_TAGS = [
   { name: '没礼貌', color: '#F9A825', beansOnComplete: 1 },
 ] as const;
 
+/** Undeletable penalty tag. Amount is small beans; 10 = one big bean. 0 disables it. */
+export const MISSED_CHECKIN_SYSTEM_KEY = 'missed_day';
+
+export const MISSED_CHECKIN_TAG = {
+  name: '未打卡扣豆',
+  color: '#6B1020',
+  beansOnComplete: SMALL_PER_BIG,
+} as const;
+
+export function isMissedCheckInTag(tag: { systemKey?: string | null }): boolean {
+  return tag.systemKey === MISSED_CHECKIN_SYSTEM_KEY;
+}
+
 export type TagKind = 'plus' | 'minus';
 
 /** Lock the bean bar / redeem when remaining small-equivalent is this or worse. */
@@ -66,6 +79,8 @@ export type BehaviorTagDto = {
   sortOrder: number;
   active: boolean;
   kind: TagKind;
+  /** Set for built-in tags. `missed_day` cannot be deleted. */
+  systemKey?: string | null;
 };
 
 export type CheckInDto = {
@@ -101,6 +116,10 @@ export type DayQuestDto = {
   beansEarned: number;
   /** Plus-tag gains only; used for danger-day fill. Redemptions do not count. */
   beansAdded: number;
+  /** Small beans taken because this day had no check-in. */
+  missedDeducted?: number;
+  /** True when that day's penalty was larger than the beans left, so danger lock applied. */
+  missedFrozen?: boolean;
 };
 
 export type RevealEvent = {

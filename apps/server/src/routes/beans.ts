@@ -4,6 +4,7 @@ import { authenticate, assertProfileAccess } from '../auth.js';
 import { toBeanDto } from '../beans.js';
 import { backfillBeanPersistence } from '../ledger.js';
 import { settlePastDangerDays } from '../quests.js';
+import { settleMissedCheckIns } from '../missed.js';
 
 export async function beanRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate);
@@ -14,6 +15,7 @@ export async function beanRoutes(app: FastifyInstance) {
     if (!profile) return reply.status(404).send({ error: '档案不存在' });
 
     await backfillBeanPersistence(query.profileId);
+    await settleMissedCheckIns(query.profileId);
     await settlePastDangerDays(query.profileId);
     return toBeanDto(query.profileId);
   });

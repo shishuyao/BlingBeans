@@ -3,6 +3,7 @@ import { prisma } from './db.js';
 import { removeBeansUpTo } from './beans.js';
 import { appendBeanLedger } from './ledger.js';
 import { daysInMonth, shanghaiToday } from './dates.js';
+import { settleMissedCheckIns } from './missed.js';
 
 function earnedFromCheckIn(c: {
   count: number;
@@ -147,6 +148,7 @@ export async function settlePastDangerDays(profileId: string, today = shanghaiTo
 }
 
 export async function ensureMonthQuests(profileId: string, month: string) {
+  await settleMissedCheckIns(profileId);
   const profile = await prisma.profile.findUniqueOrThrow({
     where: { id: profileId },
     include: {
@@ -215,5 +217,17 @@ export async function listMonthQuests(profileId: string, month: string): Promise
   for (const c of checkIns) {
     addedByDate.set(c.date, (addedByDate.get(c.date) ?? 0) + addedFromCheckIn(c));
   }
-  return rows.map((q) => toQuestDto(q, addedByDate.get(q.date) ?? 0));
+  const penalties = await prisma.missedDaySettle.findMany({
+    where: { profileId, date: { startsWith: month } },
+  });
+  const penaltyByDate = new Map(penalties.map((row) => [row.date, row]));
+  return rows.map((q) => {
+    const dto = toQuestDto(q, addedByDate.get(q.date) ?? 0);
+    const penalty = penaltyByDate.get(q.date);
+    if (penalty && (penalty.deducted > 0 || penalty.frozen)) {
+      dto.missedDeducted = penalty.deducted;
+      dto.missedFrozen = penalty.frozen;
+    }
+    return dto;
+  });
 }

@@ -1,7 +1,14 @@
 import { SMALL_PER_BIG } from '@guoguo/shared';
 import { prisma } from './db.js';
 
-export type BeanLedgerReason = 'checkin' | 'undo' | 'penalty' | 'penalty_undo' | 'redeem' | 'danger_settle';
+export type BeanLedgerReason =
+  | 'checkin'
+  | 'undo'
+  | 'penalty'
+  | 'penalty_undo'
+  | 'redeem'
+  | 'danger_settle'
+  | 'missed_checkin';
 
 export async function appendBeanLedger(input: {
   profileId: string;

@@ -212,6 +212,50 @@ export function App() {
     return () => el.removeEventListener('scroll', onScroll);
   }, [me]);
 
+  // Nested overflow-x regions (timeline, calendar, bean track) otherwise trap
+  // vertical pans on tablets — only a gap between cards would scroll the page.
+  useEffect(() => {
+    const scroller = mainRef.current;
+    if (!scroller) return;
+    const nestedSel = '.tl-scroller, .cal-board, .small-track, .profile-switch';
+    let startX = 0;
+    let startY = 0;
+    let startScroll = 0;
+    let axis: 'x' | 'y' | null = null;
+    let nested = false;
+
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+      startScroll = scroller.scrollTop;
+      axis = null;
+      nested = Boolean((e.target as Element | null)?.closest?.(nestedSel));
+    };
+
+    const onMove = (e: TouchEvent) => {
+      if (!nested || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      if (axis == null) {
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        axis = Math.abs(dy) >= Math.abs(dx) ? 'y' : 'x';
+      }
+      if (axis !== 'y') return;
+      scroller.scrollTop = startScroll - dy;
+      if (e.cancelable) e.preventDefault();
+    };
+
+    document.addEventListener('touchstart', onStart, { passive: true, capture: true });
+    document.addEventListener('touchmove', onMove, { passive: false, capture: true });
+    return () => {
+      document.removeEventListener('touchstart', onStart, true);
+      document.removeEventListener('touchmove', onMove, true);
+    };
+  }, [me]);
+
   const enqueueMerges = useCallback((events: MergeEvent[]) => {
     if (!events.length) return;
     setMergeQueue((q) => [...q, ...events]);
@@ -381,11 +425,13 @@ export function App() {
           </header>
 
           <main ref={mainRef}>
-            {view === 'calendar' ? <CalendarView /> : null}
-            {view === 'tags' ? <TagsPanel /> : null}
-            {view === 'rewards' ? <RewardsPanel /> : null}
-            {view === 'summary' ? <SummaryPanel /> : null}
-            {view === 'settings' ? <SettingsPanel /> : null}
+            <div className="page-body">
+              {view === 'calendar' ? <CalendarView /> : null}
+              {view === 'tags' ? <TagsPanel /> : null}
+              {view === 'rewards' ? <RewardsPanel /> : null}
+              {view === 'summary' ? <SummaryPanel /> : null}
+              {view === 'settings' ? <SettingsPanel /> : null}
+            </div>
           </main>
 
           <BottomNav />

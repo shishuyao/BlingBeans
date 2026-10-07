@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { beansDeltaForTag } from '@guoguo/shared';
+import { beansDeltaForTag, MISSED_CHECKIN_SYSTEM_KEY } from '@guoguo/shared';
 import { prisma } from '../db.js';
 import { authenticate, assertProfileAccess, requireParent } from '../auth.js';
 import { addBeans, removeBeans, removeBeansAllowDebt, toBeanDto } from '../beans.js';
@@ -59,6 +59,9 @@ export async function checkInRoutes(app: FastifyInstance) {
       where: { id: body.tagId, profileId: body.profileId, active: true },
     });
     if (!tag) return reply.status(404).send({ error: '标签不存在' });
+    if (tag.systemKey === MISSED_CHECKIN_SYSTEM_KEY) {
+      return reply.status(400).send({ error: '未打卡扣豆由系统自动结算，不能手动打卡' });
+    }
 
     const quest = await ensureQuest(body.profileId, body.date);
     const kind = quest.kind === 'danger' ? 'danger' : 'happy';
