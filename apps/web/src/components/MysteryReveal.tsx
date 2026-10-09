@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RevealEvent } from '@guoguo/shared';
+import { useI18n } from '../i18n';
 import { playBoxOpenSound, playDangerRevealSound, playHappyRevealSound } from '../sound';
 
 type Props = {
@@ -11,6 +12,7 @@ type Phase = 'wiggle' | 'open' | 'result';
 
 export function MysteryReveal({ event, onDone }: Props) {
   const [phase, setPhase] = useState<Phase>('wiggle');
+  const { t } = useI18n();
   const happy = event.kind === 'happy';
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
@@ -36,7 +38,7 @@ export function MysteryReveal({ event, onDone }: Props) {
       className="mystery-overlay"
       onClick={() => phase === 'result' && onDone()}
       role="dialog"
-      aria-label={happy ? '开心日揭晓' : '危险日揭晓'}
+      aria-label={happy ? t('mysteryHappy') : t('mysteryDanger')}
     >
       <div className={`mystery-stage ${phase}${happy ? ' happy' : ' danger'}`}>
         <div className="gift-scene" aria-hidden>
@@ -69,19 +71,19 @@ export function MysteryReveal({ event, onDone }: Props) {
                   <i key={i} style={{ ['--i' as string]: i }} />
                 ))}
               </div>
-              <p className="mystery-kicker">开心日！</p>
+              <p className="mystery-kicker">{t('happyKicker')}</p>
               <p className="mystery-mult">×{event.multiplier.toFixed(1)}</p>
-              <p className="mystery-sub">盒子打开啦，今天豆豆会变多</p>
+              <p className="mystery-sub">{t('happySub')}</p>
             </div>
           ) : (
             <div className="mystery-result">
-              <p className="mystery-kicker danger">危险日</p>
-              <p className="mystery-warn">今天要集齐 {event.dangerNeed} 颗豆</p>
-              <p className="mystery-sub">集不够，第二天会扣这么多</p>
+              <p className="mystery-kicker danger">{t('dangerKicker')}</p>
+              <p className="mystery-warn">{t('dangerWarn', { n: event.dangerNeed })}</p>
+              <p className="mystery-sub">{t('dangerSub')}</p>
             </div>
           )
         ) : (
-          <p className="mystery-kicker">{phase === 'wiggle' ? '摇一摇…' : '打开啦！'}</p>
+          <p className="mystery-kicker">{phase === 'wiggle' ? t('wiggle') : t('opened')}</p>
         )}
       </div>
     </div>

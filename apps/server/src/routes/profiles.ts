@@ -22,6 +22,7 @@ export async function profileRoutes(app: FastifyInstance) {
         name: z.string().min(1),
         avatarColor: z.string().optional(),
         seedDefaultTags: z.boolean().optional(),
+        locale: z.enum(['zh', 'en']).optional(),
       })
       .parse(request.body);
 
@@ -41,7 +42,7 @@ export async function profileRoutes(app: FastifyInstance) {
       await tx.beanBalance.create({ data: { profileId: p.id } });
       if (body.seedDefaultTags !== false) {
         await tx.behaviorTag.createMany({
-          data: defaultTagRows(p.id),
+          data: defaultTagRows(p.id, body.locale === 'en' ? 'en' : 'zh'),
         });
       }
       return p;

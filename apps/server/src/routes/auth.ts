@@ -15,6 +15,7 @@ export async function authRoutes(app: FastifyInstance) {
         name: z.string().min(1),
         familyName: z.string().min(1).optional(),
         profileName: z.string().min(1).optional(),
+        locale: z.enum(['zh', 'en']).optional(),
       })
       .parse(request.body);
 
@@ -24,8 +25,9 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     const passwordHash = await bcrypt.hash(body.password, 10);
-    const familyName = body.familyName ?? `${body.name}的家庭`;
-    const profileName = body.profileName ?? '孩子';
+    const english = body.locale === 'en';
+    const familyName = body.familyName ?? (english ? `${body.name}'s family` : `${body.name}的家庭`);
+    const profileName = body.profileName ?? (english ? 'Kid' : '孩子');
 
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -45,7 +47,7 @@ export async function authRoutes(app: FastifyInstance) {
       });
       await tx.beanBalance.create({ data: { profileId: profile.id } });
       await tx.behaviorTag.createMany({
-        data: defaultTagRows(profile.id),
+        data: defaultTagRows(profile.id, body.locale === 'en' ? 'en' : 'zh'),
       });
       return { user, family, profile };
     });

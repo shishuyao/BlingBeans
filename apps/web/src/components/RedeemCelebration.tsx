@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { RewardDto } from '@guoguo/shared';
 import { playRedeemSound } from '../sound';
+import { useI18n } from '../i18n';
 import { CartoonBean } from './CartoonBean';
 
 type Props = {
@@ -11,6 +12,7 @@ type Props = {
 const CONFETTI = ['#FF5252', '#FFD54F', '#66BB6A', '#42A5F5', '#AB47BC', '#FF8A65'];
 
 export function RedeemCelebration({ reward, onDone }: Props) {
+  const { t } = useI18n();
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
 
@@ -67,7 +69,7 @@ export function RedeemCelebration({ reward, onDone }: Props) {
           )}
         </div>
         <div className="redeem-copy">
-          <div className="redeem-title">兑换成功！</div>
+          <div className="redeem-title">{t('redeemSuccess')}</div>
           <div className="redeem-name">{reward.title}</div>
         </div>
       </div>

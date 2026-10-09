@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useI18n } from '../i18n';
 
 type Props = {
   file: File;
@@ -10,6 +11,7 @@ type Props = {
 type Pt = { x: number; y: number };
 
 export function ImageCropper({ file, aspect = 4 / 3, onCancel, onConfirm }: Props) {
+  const { t } = useI18n();
   const viewportRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const pointers = useRef(new Map<number, Pt>());
@@ -142,10 +144,10 @@ export function ImageCropper({ file, aspect = 4 / 3, onCancel, onConfirm }: Prop
   const dh = nat.h * scale;
 
   return (
-    <div className="crop-overlay" role="dialog" aria-modal aria-label="裁剪照片">
+    <div className="crop-overlay" role="dialog" aria-modal aria-label={t('cropTitle')}>
       <div className="crop-card">
-        <h3>裁剪照片</h3>
-        <p className="crop-sub">拖动调整位置，双指或滑杆缩放</p>
+        <h3>{t('cropTitle')}</h3>
+        <p className="crop-sub">{t('cropSub')}</p>
         <div
           ref={viewportRef}
           className="crop-viewport"
@@ -179,7 +181,7 @@ export function ImageCropper({ file, aspect = 4 / 3, onCancel, onConfirm }: Prop
           <div className="crop-grid" />
         </div>
         <label className="crop-zoom">
-          <span>缩放</span>
+          <span>{t('zoom')}</span>
           <input
             type="range"
             min={1}
@@ -191,10 +193,10 @@ export function ImageCropper({ file, aspect = 4 / 3, onCancel, onConfirm }: Prop
         </label>
         <div className="form-inline">
           <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={onCancel} disabled={busy}>
-            取消
+            {t('cancel')}
           </button>
           <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={confirm} disabled={busy || !nat.w}>
-            {busy ? '处理中…' : '完成'}
+            {busy ? t('processing') : t('done')}
           </button>
         </div>
       </div>

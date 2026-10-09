@@ -1,18 +1,20 @@
 import type { AppView } from '../appContext';
 import { useApp } from '../appContext';
+import { useI18n, type MessageKey } from '../i18n';
 
-const ITEMS: Array<{ id: AppView; icon: string; label: string }> = [
-  { id: 'calendar', icon: '📅', label: '日历' },
-  { id: 'tags', icon: '🏷', label: '标签' },
-  { id: 'rewards', icon: '🎁', label: '奖励' },
-  { id: 'summary', icon: '📊', label: '总结' },
-  { id: 'settings', icon: '⚙️', label: '设置' },
+const ITEMS: Array<{ id: AppView; icon: string; label: MessageKey }> = [
+  { id: 'calendar', icon: '📅', label: 'navCalendar' },
+  { id: 'tags', icon: '🏷', label: 'navTags' },
+  { id: 'rewards', icon: '🎁', label: 'navRewards' },
+  { id: 'summary', icon: '📊', label: 'navSummary' },
+  { id: 'settings', icon: '⚙️', label: 'navSettings' },
 ];
 
 export function BottomNav() {
   const { view, setView } = useApp();
+  const { t } = useI18n();
   return (
-    <nav className="bottom-nav" aria-label="主导航">
+    <nav className="bottom-nav" aria-label={t('navLabel')}>
       {ITEMS.map((item) => (
         <button
           key={item.id}
@@ -21,7 +23,7 @@ export function BottomNav() {
           onClick={() => setView(item.id)}
         >
           <span className="nav-icon">{item.icon}</span>
-          {item.label}
+          {t(item.label)}
         </button>
       ))}
     </nav>

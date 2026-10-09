@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { TAG_COLORS } from '@guoguo/shared';
 import { api } from '../api';
-import { remainingUnlockLabel, useApp } from '../appContext';
+import { useApp } from '../appContext';
+import { useI18n } from '../i18n';
 
 export function SettingsPanel() {
   const {
@@ -17,6 +18,13 @@ export function SettingsPanel() {
     lockParent,
     openPinModal,
   } = useApp();
+  const { t, tr, locale } = useI18n();
+  const remain = (until: string | null) => {
+    if (!until) return '';
+    const ms = new Date(until).getTime() - Date.now();
+    if (ms <= 0) return t('unlockExpired');
+    return t('minutes', { m: Math.ceil(ms / 60000) });
+  };
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>(TAG_COLORS[1]);
   const [error, setError] = useState('');
@@ -29,12 +37,12 @@ export function SettingsPanel() {
     setBusy(true);
     setError('');
     try {
-      const p = await api.profiles.create({ name: name.trim(), avatarColor: color });
+      const p = await api.profiles.create({ name: name.trim(), avatarColor: color, locale });
       setName('');
       await refreshMe();
       setProfileId(p.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : '创建失败');
+      setError(e instanceof Error ? e.message : t('createFail'));
     } finally {
       setBusy(false);
     }
@@ -50,26 +58,26 @@ export function SettingsPanel() {
       setHappyRate(Math.round(res.happyDayRate * 100));
       await refreshMe();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存失败');
+      setError(e instanceof Error ? e.message : t('saveFail'));
     } finally {
       setRateBusy(false);
     }
   };
 
   const rename = async (id: string, next: string) => {
-    const n = prompt('新名称', next);
+    const n = prompt(t('newNamePrompt'), next);
     if (!n?.trim()) return;
     await api.profiles.update(id, { name: n.trim() });
     await refreshMe();
   };
 
   const remove = async (id: string, pname: string) => {
-    if (!confirm(`删除档案「${pname}」？所有打卡与豆豆将一并删除。`)) return;
+    if (!confirm(t('deleteProfileConfirm', { name: pname }))) return;
     try {
       await api.profiles.remove(id);
       await refreshMe();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '删除失败');
+      setError(e instanceof Error ? e.message : t('deleteFail'));
     }
   };
 
@@ -81,32 +89,32 @@ export function SettingsPanel() {
   return (
     <div>
       <div className="panel">
-        <h3>家长 PIN 锁</h3>
+        <h3>{t('pinLockTitle')}</h3>
         <p style={{ margin: '0 0 12px', color: 'var(--ink-muted)', fontWeight: 700, fontSize: '0.9rem' }}>
           {hasPin
             ? parentUnlocked
-              ? `已解锁，约 ${remainingUnlockLabel(unlockUntil)} 后自动锁定`
-              : '已锁定 · 打卡与兑奖需输入 PIN'
-            : '尚未设置 · 建议立刻设置，防止小朋友乱加豆豆'}
+              ? t('pinStatusUnlocked', { time: remain(unlockUntil) })
+              : t('pinStatusLocked')
+            : t('pinStatusUnset')}
         </p>
         <div className="form-inline">
           {!hasPin ? (
             <button type="button" className="btn btn-primary" onClick={() => openPinModal('setup')}>
-              设置 PIN
+              {t('setPin')}
             </button>
           ) : (
             <>
               {parentUnlocked ? (
                 <button type="button" className="btn btn-ghost" onClick={() => lockParent()}>
-                  立即锁定
+                  {t('lockNow')}
                 </button>
               ) : (
                 <button type="button" className="btn btn-primary" onClick={() => openPinModal('unlock')}>
-                  解锁
+                  {t('unlock')}
                 </button>
               )}
               <button type="button" className="btn btn-ghost" onClick={() => openPinModal('change')}>
-                修改 PIN
+                {t('changePin')}
               </button>
             </>
           )}
@@ -114,23 +122,23 @@ export function SettingsPanel() {
       </div>
 
       <div className="panel">
-        <h3>家庭账号</h3>
+        <h3>{t('familyAccount')}</h3>
         <p style={{ margin: '0 0 8px', color: 'var(--ink-muted)', fontWeight: 700 }}>
           {me?.familyName} · {me?.user.email}
         </p>
         <button type="button" className="btn btn-ghost" onClick={logout}>
-          退出登录
+          {t('logout')}
         </button>
       </div>
 
-      {error ? <div className="error-banner">{error}</div> : null}
+      {error ? <div className="error-banner">{tr(error)}</div> : null}
 
       <div className="panel">
-        <h3>探宝日历</h3>
+        <h3>{t('questCalendar')}</h3>
         <p style={{ margin: '0 0 10px', color: 'var(--ink-muted)', fontWeight: 700, fontSize: '0.9rem' }}>
-          开心日概率 {happyRate}% · 危险日 {100 - happyRate}%
+          {t('happyRate', { happy: happyRate, danger: 100 - happyRate })}
           <br />
-          只影响还没生成的日子，已经开过的格子不会变。
+          {t('happyRateHint')}
         </p>
         <input
           type="range"
@@ -138,7 +146,7 @@ export function SettingsPanel() {
           max={100}
           step={5}
           value={happyRate}
-          aria-label="开心日概率"
+          aria-label={t('happyRateAria')}
           onChange={(e) => setHappyRate(Number(e.target.value))}
           onPointerUp={(e) => {
             void saveHappyRate(Number((e.currentTarget as HTMLInputElement).value));
@@ -149,12 +157,12 @@ export function SettingsPanel() {
           style={{ width: '100%' }}
         />
         {rateBusy ? (
-          <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: 'var(--ink-muted)' }}>保存中…</p>
+          <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: 'var(--ink-muted)' }}>{t('saving')}</p>
         ) : null}
       </div>
 
       <div className="panel">
-        <h3>成员档案</h3>
+        <h3>{t('profiles')}</h3>
         <div className="manage-list">
           {profiles.map((p) => (
             <div key={p.id} className="manage-item">
@@ -162,17 +170,17 @@ export function SettingsPanel() {
               <div className="info">
                 <div className="title">
                   {p.name}
-                  {p.id === profileId ? '（当前）' : ''}
+                  {p.id === profileId ? t('current') : ''}
                 </div>
               </div>
               <button type="button" className="btn btn-ghost" onClick={() => setProfileId(p.id)}>
-                切换
+                {t('switchProfile')}
               </button>
               <button type="button" className="btn btn-ghost" onClick={() => rename(p.id, p.name)}>
-                改名
+                {t('rename')}
               </button>
               <button type="button" className="btn btn-danger" onClick={() => remove(p.id, p.name)}>
-                删
+                {t('delete')}
               </button>
             </div>
           ))}
@@ -180,13 +188,13 @@ export function SettingsPanel() {
       </div>
 
       <div className="panel">
-        <h3>添加孩子档案</h3>
+        <h3>{t('addChild')}</h3>
         <div className="form-row">
-          <label>名字</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="孩子名字" />
+          <label>{t('nameLabel')}</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('childNamePh')} />
         </div>
         <div className="form-row">
-          <label>颜色</label>
+          <label>{t('colorLabel')}</label>
           <div className="color-picker">
             {TAG_COLORS.map((c) => (
               <button
@@ -200,7 +208,7 @@ export function SettingsPanel() {
           </div>
         </div>
         <button type="button" className="btn btn-primary" disabled={busy || !name.trim()} onClick={addProfile}>
-          添加
+          {t('addBtn')}
         </button>
       </div>
     </div>

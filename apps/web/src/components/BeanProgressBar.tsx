@@ -1,8 +1,10 @@
 import { useApp } from '../appContext';
+import { useI18n } from '../i18n';
 import { CartoonBean } from './CartoonBean';
 
 export function BeanProgressBar() {
   const { beans } = useApp();
+  const { t } = useI18n();
   if (!beans) {
     return (
       <div className="bean-bar">
@@ -20,18 +22,18 @@ export function BeanProgressBar() {
 
   return (
     <div className={`bean-bar${danger ? ' danger' : ''}`}>
-      <div className="big-beans" title={danger ? '危险模式' : '黄金大豆豆'}>
+      <div className="big-beans" title={danger ? t('dangerModeTitle') : t('bigBeanTitle')}>
         <CartoonBean color="#F5C518" variant="big" size={64} face={danger ? 'wink' : 'sparkle'} className="big-bean-svg" />
         <span className="big-count">×{beans.bigBeans}</span>
       </div>
       <div
         className="small-track"
         aria-label={
-          beans.smallBeans < 0 ? `欠 ${Math.abs(beans.smallBeans)} 豆` : `小豆豆 ${beans.smallBeans}/10`
+          beans.smallBeans < 0 ? t('debtAria', { n: Math.abs(beans.smallBeans) }) : t('smallAria', { n: beans.smallBeans })
         }
       >
         {beans.smallBeans < 0 ? (
-          <div className="debt-label">欠 {Math.abs(beans.smallBeans)} 豆</div>
+          <div className="debt-label">{t('debtLabel', { n: Math.abs(beans.smallBeans) })}</div>
         ) : (
           slots.map((color, i) => (
             <div key={i} className="small-slot">

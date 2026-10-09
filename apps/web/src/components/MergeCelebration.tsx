@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { playMergeSound } from '../sound';
 import { useApp } from '../appContext';
+import { useI18n } from '../i18n';
 import { CartoonBean } from './CartoonBean';
 
 export function MergeCelebration() {
   const { mergeQueue, shiftMerge } = useApp();
+  const { t } = useI18n();
   const [visible, setVisible] = useState(false);
   const event = mergeQueue[0];
 
@@ -57,7 +59,7 @@ export function MergeCelebration() {
         <div className="merge-big">
           <CartoonBean color="#F5C518" variant="big" size={110} face="sparkle" />
         </div>
-        <div className="merge-text">合成大豆豆！</div>
+        <div className="merge-text">{t('mergeText')}</div>
       </div>
     </div>
   );

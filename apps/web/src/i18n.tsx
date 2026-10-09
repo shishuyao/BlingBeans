@@ -1,0 +1,537 @@
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+
+export type Locale = 'zh' | 'en';
+
+const STORAGE_KEY = 'guoguo_locale';
+
+const zh = {
+  brand: '果果豆豆',
+  subtitle: '行为打卡 · 豆豆奖励',
+  loading: '加载中…',
+  language: '语言',
+  navCalendar: '日历',
+  navTags: '标签',
+  navRewards: '奖励',
+  navSummary: '总结',
+  navSettings: '设置',
+  navLabel: '主导航',
+  pinSetupAria: '设置家长 PIN',
+  pinLockAria: '锁定家长 PIN',
+  pinUnlockAria: '解锁家长 PIN',
+  pinUnsetTitle: '未设置家长 PIN',
+  pinUnlockedTitle: '已解锁 · 点击锁定 · 剩余 {time}',
+  pinLockedTitle: '已锁定 · 点击解锁',
+  debtBanner: '豆豆锁定 · 欠豆已到 5 颗，先打卡加豆',
+  dangerBanner: '危险模式 · 先打卡攒够豆（当天超过 5 颗即可解锁兑奖）',
+  kidBanner: '孩子模式 · 打卡/兑奖需家长解锁',
+  parentBanner: '家长已解锁 · 约 {time}后自动锁定',
+  unlockExpired: '已过期',
+  minutes: '{m}分钟',
+  prevMonth: '上个月',
+  nextMonth: '下个月',
+  notYet: '还没到',
+  missedDay: '未打卡',
+  unopened: '待开',
+  beansShort: '{n}豆',
+  dangerProgress: '{added}/{need}豆',
+  todayMark: '今',
+  needLabel: '需',
+  futureHint: '这一天还没到，先保持神秘哦',
+  checkinFail: '打卡失败',
+  undoFail: '撤销失败',
+  noPlusTags: '还没有加豆标签',
+  noMinusTags: '还没有扣豆标签',
+  undoOnce: '减少一次',
+  deduct: '扣豆',
+  checkIn: '打卡',
+  notDeducted: '未扣',
+  notChecked: '未打卡',
+  checkinTitle: '{month}月{day}日打卡',
+  happyBanner: '开心日 · 豆豆 ×{mult}',
+  dangerPass: '危险日过关 · 今日加豆 {added}/{need}',
+  dangerFail: '危险日未过关 · 已扣除 {need} 豆',
+  dangerToday: '危险日 · 今天要加满 {need} 颗（已加 {added}，兑奖不算）',
+  pastReadOnly: '这一天已经过去，只能看看，不能再改哦',
+  kidModeHint: '当前是孩子模式，不能自己加减豆豆',
+  parentUnlock: '家长解锁',
+  noBehaviorTags: '还没有行为标签，请先去「标签」页添加',
+  plusCol: '加豆',
+  minusCol: '扣豆',
+  close: '关闭',
+  tagMinMinus: '扣豆数至少为 1',
+  tagMinPlus: '达标豆豆数至少为 1',
+  saveFail: '保存失败',
+  deleteTagConfirm: '删除标签「{name}」？历史打卡会保留。',
+  missedOff: '已关闭 · 漏打卡不扣豆',
+  missedDayLine: '漏打卡一天 −{n} 小豆（{big}）',
+  bigBeansExact: '{n} 大豆',
+  bigBeansDecimal: '{n} 大豆',
+  editMinus: '编辑扣豆标签',
+  editPlus: '编辑加豆标签',
+  newMinus: '新增扣豆标签',
+  newPlus: '新增加豆标签',
+  noPlusYet: '暂无加豆标签',
+  noMinusYet: '暂无扣豆标签',
+  onceMinus: '一次 −{n} 小豆',
+  oncePlus: '达标 +{n} 小豆',
+  missedTagName: '未打卡扣豆',
+  plusTags: '加豆标签',
+  minusTags: '扣豆标签',
+  newBtn: '＋ 新增',
+  missedNote:
+    '从第一次打卡的第二天起，已经过去却没打卡的日子会自动扣这里的数量。10 小豆 = 1 大豆。填 0 则不扣。要扣的比剩下的多时，扣到 0 并进入危险模式。这条不能删除。',
+  nameLabel: '名称',
+  colorLabel: '颜色',
+  exampleTantrum: '例如：发脾气',
+  examplePolite: '例如：礼貌交友',
+  missedAmountLabel: '未打卡扣几颗小豆',
+  onceDeduct: '一次扣豆数',
+  beansToEarn: '达标豆豆数',
+  save: '保存',
+  add: '添加',
+  cancel: '取消',
+  edit: '编辑',
+  delete: '删',
+  parentFallback: '家长',
+  kidFallback: '孩子',
+  actionFail: '操作失败',
+  optional: '可选',
+  parentNickname: '家长昵称',
+  familyName: '家庭名称',
+  firstChild: '第一个孩子名字',
+  email: '邮箱',
+  password: '密码',
+  login: '登录',
+  registerFamily: '注册家庭',
+  noAccount: '还没有账号？',
+  register: '注册',
+  hasAccount: '已有账号？',
+  pinUnlockTitle: '家长解锁',
+  oldPin: '输入旧 PIN',
+  newPin: '设置新 PIN',
+  confirmAgain: '再输入一次',
+  confirmSetup: '再输入一次确认',
+  setupPin: '设置家长 PIN',
+  unlockHint: '输入 4 位数字后才能打卡或兑奖',
+  setupHint: '防止小朋友自己乱加豆豆',
+  changeHint: '修改后请牢记新 PIN',
+  unlockFail: '解锁失败',
+  pinMismatch: '两次输入不一致',
+  setupFail: '设置失败',
+  createFail: '创建失败',
+  newNamePrompt: '新名称',
+  deleteProfileConfirm: '删除档案「{name}」？所有打卡与豆豆将一并删除。',
+  deleteFail: '删除失败',
+  pinStatusUnlocked: '已解锁，约 {time} 后自动锁定',
+  pinStatusLocked: '已锁定 · 打卡与兑奖需输入 PIN',
+  pinStatusUnset: '尚未设置 · 建议立刻设置，防止小朋友乱加豆豆',
+  setPin: '设置 PIN',
+  lockNow: '立即锁定',
+  unlock: '解锁',
+  changePin: '修改 PIN',
+  familyAccount: '家庭账号',
+  logout: '退出登录',
+  questCalendar: '探宝日历',
+  happyRate: '开心日概率 {happy}% · 危险日 {danger}%',
+  happyRateHint: '只影响还没生成的日子，已经开过的格子不会变。',
+  happyRateAria: '开心日概率',
+  saving: '保存中…',
+  profiles: '成员档案',
+  current: '（当前）',
+  switchProfile: '切换',
+  rename: '改名',
+  addChild: '添加孩子档案',
+  childNamePh: '孩子名字',
+  addBtn: '添加',
+  bigBeanTitle: '黄金大豆豆',
+  dangerModeTitle: '危险模式',
+  debtAria: '欠 {n} 豆',
+  smallAria: '小豆豆 {n}/10',
+  debtLabel: '欠 {n} 豆',
+  rewardFallback: '奖励',
+  monthSummary: '{month}总结',
+  smallEarned: '本月获得小豆',
+  redeemCount: '兑奖次数',
+  achievements: '打卡成就',
+  noCheckins: '本月还没有打卡',
+  noRedeems: '本月还没有兑换奖励',
+  albumTimes: '{title}，兑换 {n} 次',
+  albumTitle: '兑奖相册',
+  costBig: '{n} 大豆',
+  costSmall: '{n} 小豆',
+  free: '免费',
+  uploadFail: '上传失败',
+  setPrice: '请设置兑换价格',
+  redeemConfirm: '确认兑换「{title}」？',
+  redeemFail: '兑换失败',
+  deleteRewardConfirm: '删除奖励「{title}」？',
+  dangerRedeemBanner: '危险模式锁定兑奖 · 今天打卡超过 5 颗豆即可解锁',
+  addReward: '＋ 添加奖励',
+  editReward: '编辑奖励',
+  newReward: '新建奖励',
+  exampleIceCream: '例如：一次冰淇淋',
+  bigBeansLabel: '大豆豆',
+  smallBeansLabel: '小豆豆',
+  photo: '照片',
+  preview: '预览',
+  noRewards: '还没有奖励，点上方添加',
+  locked: '已锁定',
+  redeem: '兑换',
+  timelineTitle: '兑换时间轴',
+  today: '今天',
+  yesterday: '昨天',
+  monthDay: '{m}月{d}日',
+  yearMonthDay: '{y}年{m}月{d}日',
+  timelineAria: '{date}的兑换，共{n}张',
+  sheets: '{n} 张',
+  albumCount: '{name} · {n} 次',
+  albumDay: '{date} · {n} 张',
+  albumTotal: '兑换相册 · {n} 张',
+  spent: '花费 {cost}',
+  noRedeemsEver: '还没有兑换记录',
+  mysteryHappy: '开心日揭晓',
+  mysteryDanger: '危险日揭晓',
+  happyKicker: '开心日！',
+  happySub: '盒子打开啦，今天豆豆会变多',
+  dangerKicker: '危险日',
+  dangerWarn: '今天要集齐 {n} 颗豆',
+  dangerSub: '集不够，第二天会扣这么多',
+  wiggle: '摇一摇…',
+  opened: '打开啦！',
+  mergeText: '合成大豆豆！',
+  redeemSuccess: '兑换成功！',
+  cropTitle: '裁剪照片',
+  cropSub: '拖动调整位置，双指或滑杆缩放',
+  zoom: '缩放',
+  processing: '处理中…',
+  done: '完成',
+  monthLabel: '{y}年{m}月',
+  pinLockTitle: '家长 PIN 锁',
+} as const;
+
+export type MessageKey = keyof typeof zh;
+
+const en: Record<MessageKey, string> = {
+  brand: 'Guoguo',
+  subtitle: 'Check-in · bean rewards',
+  loading: 'Loading…',
+  language: 'Language',
+  navCalendar: 'Calendar',
+  navTags: 'Tags',
+  navRewards: 'Rewards',
+  navSummary: 'Summary',
+  navSettings: 'Settings',
+  navLabel: 'Main',
+  pinSetupAria: 'Set parent PIN',
+  pinLockAria: 'Lock parent PIN',
+  pinUnlockAria: 'Unlock parent PIN',
+  pinUnsetTitle: 'No parent PIN yet',
+  pinUnlockedTitle: 'Unlocked · tap to lock · {time} left',
+  pinLockedTitle: 'Locked · tap to unlock',
+  debtBanner: 'Beans locked · 5 beans in debt. Check in to earn some back',
+  dangerBanner: 'Danger mode · earn beans first (more than 5 new beans today unlocks rewards)',
+  kidBanner: 'Kid mode · check-in and rewards need a parent',
+  parentBanner: 'Parent unlocked · locks in about {time}',
+  unlockExpired: 'expired',
+  minutes: '{m} min',
+  prevMonth: 'Previous month',
+  nextMonth: 'Next month',
+  notYet: 'Later',
+  missedDay: 'Missed',
+  unopened: 'Sealed',
+  beansShort: '{n}',
+  dangerProgress: '{added}/{need}',
+  todayMark: 'Now',
+  needLabel: 'Need',
+  futureHint: 'That day is not here yet',
+  checkinFail: 'Check-in failed',
+  undoFail: 'Could not undo',
+  noPlusTags: 'No earn tags yet',
+  noMinusTags: 'No deduct tags yet',
+  undoOnce: 'Remove one',
+  deduct: 'Deduct',
+  checkIn: 'Check in',
+  notDeducted: 'None',
+  notChecked: 'Not yet',
+  checkinTitle: '{month}/{day}',
+  happyBanner: 'Happy day · beans ×{mult}',
+  dangerPass: 'Danger day cleared · earned {added}/{need}',
+  dangerFail: 'Danger day missed · deducted {need}',
+  dangerToday: 'Danger day · earn {need} today ({added} so far, rewards do not count)',
+  pastReadOnly: 'This day is over. You can look, but not change it',
+  kidModeHint: 'Kid mode is on. Beans cannot be changed',
+  parentUnlock: 'Parent unlock',
+  noBehaviorTags: 'No tags yet. Add some on the Tags page',
+  plusCol: 'Earn',
+  minusCol: 'Deduct',
+  close: 'Close',
+  tagMinMinus: 'Deduct at least 1',
+  tagMinPlus: 'Earn at least 1',
+  saveFail: 'Could not save',
+  deleteTagConfirm: 'Delete tag “{name}”? Past check-ins stay.',
+  missedOff: 'Off · missed days are not charged',
+  missedDayLine: 'Missed day −{n} small ({big})',
+  bigBeansExact: '{n} big',
+  bigBeansDecimal: '{n} big',
+  editMinus: 'Edit deduct tag',
+  editPlus: 'Edit earn tag',
+  newMinus: 'New deduct tag',
+  newPlus: 'New earn tag',
+  noPlusYet: 'No earn tags',
+  noMinusYet: 'No deduct tags',
+  onceMinus: '−{n} small each time',
+  oncePlus: '+{n} small when done',
+  missedTagName: 'Missed check-in',
+  plusTags: 'Earn tags',
+  minusTags: 'Deduct tags',
+  newBtn: '+ New',
+  missedNote:
+    'After the first check-in, each finished day with no check-in costs this many small beans. 10 small = 1 big. 0 turns it off. If the cost is more than the beans left, the balance goes to 0 and danger mode starts. This tag cannot be deleted.',
+  nameLabel: 'Name',
+  colorLabel: 'Color',
+  exampleTantrum: 'e.g. Tantrum',
+  examplePolite: 'e.g. Kind to friends',
+  missedAmountLabel: 'Small beans for a missed day',
+  onceDeduct: 'Beans deducted',
+  beansToEarn: 'Beans earned',
+  save: 'Save',
+  add: 'Add',
+  cancel: 'Cancel',
+  edit: 'Edit',
+  delete: 'Del',
+  parentFallback: 'Parent',
+  kidFallback: 'Kid',
+  actionFail: 'Something went wrong',
+  optional: 'Optional',
+  parentNickname: 'Parent name',
+  familyName: 'Family name',
+  firstChild: 'First child',
+  email: 'Email',
+  password: 'Password',
+  login: 'Log in',
+  registerFamily: 'Create family',
+  noAccount: 'No account?',
+  register: 'Sign up',
+  hasAccount: 'Already have one?',
+  pinUnlockTitle: 'Parent unlock',
+  oldPin: 'Enter the old PIN',
+  newPin: 'Choose a new PIN',
+  confirmAgain: 'Enter it again',
+  confirmSetup: 'Enter it again to confirm',
+  setupPin: 'Set a parent PIN',
+  unlockHint: 'Enter 4 digits to check in or redeem',
+  setupHint: 'Stops kids from awarding beans themselves',
+  changeHint: 'Remember the new PIN',
+  unlockFail: 'Unlock failed',
+  pinMismatch: 'The two entries do not match',
+  setupFail: 'Could not save the PIN',
+  createFail: 'Could not create',
+  newNamePrompt: 'New name',
+  deleteProfileConfirm: 'Delete “{name}”? Check-ins and beans for this child will be removed.',
+  deleteFail: 'Could not delete',
+  pinStatusUnlocked: 'Unlocked, locks in about {time}',
+  pinStatusLocked: 'Locked · check-in and rewards need the PIN',
+  pinStatusUnset: 'Not set · set one so kids cannot add beans',
+  setPin: 'Set PIN',
+  lockNow: 'Lock now',
+  unlock: 'Unlock',
+  changePin: 'Change PIN',
+  familyAccount: 'Family account',
+  logout: 'Log out',
+  questCalendar: 'Treasure calendar',
+  happyRate: 'Happy days {happy}% · danger days {danger}%',
+  happyRateHint: 'Only days that are not rolled yet. Opened days stay as they are.',
+  happyRateAria: 'Happy day chance',
+  saving: 'Saving…',
+  profiles: 'Children',
+  current: ' (current)',
+  switchProfile: 'Switch',
+  rename: 'Rename',
+  addChild: 'Add a child',
+  childNamePh: 'Child’s name',
+  addBtn: 'Add',
+  bigBeanTitle: 'Big gold bean',
+  dangerModeTitle: 'Danger mode',
+  debtAria: '{n} beans in debt',
+  smallAria: 'Small beans {n}/10',
+  debtLabel: '{n} in debt',
+  rewardFallback: 'Reward',
+  monthSummary: '{month}',
+  smallEarned: 'Small beans this month',
+  redeemCount: 'Rewards redeemed',
+  achievements: 'Check-ins',
+  noCheckins: 'No check-ins this month',
+  noRedeems: 'No rewards redeemed this month',
+  albumTimes: '{title}, redeemed {n} times',
+  albumTitle: 'Reward album',
+  costBig: '{n} big',
+  costSmall: '{n} small',
+  free: 'Free',
+  uploadFail: 'Upload failed',
+  setPrice: 'Set a price',
+  redeemConfirm: 'Redeem “{title}”?',
+  redeemFail: 'Could not redeem',
+  deleteRewardConfirm: 'Delete reward “{title}”?',
+  dangerRedeemBanner: 'Rewards are locked in danger mode · earn more than 5 beans today to unlock',
+  addReward: '+ Add reward',
+  editReward: 'Edit reward',
+  newReward: 'New reward',
+  exampleIceCream: 'e.g. An ice cream',
+  bigBeansLabel: 'Big beans',
+  smallBeansLabel: 'Small beans',
+  photo: 'Photo',
+  preview: 'Preview',
+  noRewards: 'No rewards yet. Add one above',
+  locked: 'Locked',
+  redeem: 'Redeem',
+  timelineTitle: 'Redemption timeline',
+  today: 'Today',
+  yesterday: 'Yesterday',
+  monthDay: '{m}/{d}',
+  yearMonthDay: '{y}/{m}/{d}',
+  timelineAria: 'Redemptions on {date}, {n} cards',
+  sheets: '{n}',
+  albumCount: '{name} · {n} times',
+  albumDay: '{date} · {n}',
+  albumTotal: 'Album · {n}',
+  spent: 'Cost {cost}',
+  noRedeemsEver: 'No redemptions yet',
+  mysteryHappy: 'Happy day reveal',
+  mysteryDanger: 'Danger day reveal',
+  happyKicker: 'Happy day!',
+  happySub: 'The box is open. Beans grow today',
+  dangerKicker: 'Danger day',
+  dangerWarn: 'Collect {n} beans today',
+  dangerSub: 'Miss it, and that many are taken tomorrow',
+  wiggle: 'Shake…',
+  opened: 'Open!',
+  mergeText: 'Big bean!',
+  redeemSuccess: 'Redeemed!',
+  cropTitle: 'Crop photo',
+  cropSub: 'Drag to move. Pinch or use the slider to zoom',
+  zoom: 'Zoom',
+  processing: 'Working…',
+  done: 'Done',
+  monthLabel: '{month} {y}',
+  pinLockTitle: 'Parent PIN',
+};
+
+const errorEn: Record<string, string> = {
+  档案不存在: 'Profile not found',
+  标签不存在: 'Tag not found',
+  '未打卡扣豆不能删除，数量改成 0 就不会扣': 'Missed check-in cannot be deleted. Set the amount to 0 to turn it off',
+  这一天还没到: 'That day is not here yet',
+  已经过去的日子不能再改: 'Past days cannot be changed',
+  '未打卡扣豆由系统自动结算，不能手动打卡': 'Missed check-in is applied automatically',
+  没有打卡记录: 'No check-in to undo',
+  '豆豆不足，无法撤销（可能已用于兑换）': 'Not enough beans to undo (they may already be spent)',
+  请设置兑换所需豆豆: 'Set a bean price',
+  奖励不存在: 'Reward not found',
+  '危险模式中，先打卡攒够豆再兑奖': 'Danger mode is on. Earn beans before redeeming',
+  豆豆不足: 'Not enough beans',
+  至少保留一个档案: 'Keep at least one child',
+  该邮箱已注册: 'That email is already registered',
+  邮箱或密码错误: 'Wrong email or password',
+  账号未关联家庭: 'This account has no family',
+  请输入4位数字: 'Enter 4 digits',
+  '请输入旧 PIN': 'Enter the old PIN',
+  '旧 PIN 不正确': 'Old PIN is wrong',
+  '尚未设置家长 PIN': 'No parent PIN yet',
+  'PIN 不正确': 'Wrong PIN',
+  未登录: 'Not signed in',
+  家庭不存在: 'Family not found',
+  需要家长解锁: 'Parent unlock required',
+  家长解锁已过期: 'Parent unlock expired',
+  请选择图片: 'Choose an image',
+  '仅支持 JPG/PNG/WebP/GIF': 'Use JPG, PNG, WebP, or GIF',
+  '图片不能超过 5MB': 'Image must be under 5MB',
+  'Not found': 'Not found',
+};
+
+type Vars = Record<string, string | number>;
+
+type I18nValue = {
+  locale: Locale;
+  setLocale: (locale: Locale) => void;
+  t: (key: MessageKey, vars?: Vars) => string;
+  tr: (message: string) => string;
+};
+
+const I18nContext = createContext<I18nValue | null>(null);
+
+function readLocale(): Locale {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved === 'zh' || saved === 'en') return saved;
+  return navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en';
+}
+
+function fill(template: string, vars?: Vars) {
+  if (!vars) return template;
+  let s = template;
+  for (const [key, value] of Object.entries(vars)) {
+    s = s.split(`{${key}}`).join(String(value));
+  }
+  return s;
+}
+
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const [locale, setLocaleState] = useState<Locale>(readLocale);
+
+  const setLocale = (next: Locale) => {
+    localStorage.setItem(STORAGE_KEY, next);
+    setLocaleState(next);
+  };
+
+  useEffect(() => {
+    document.documentElement.lang = locale === 'zh' ? 'zh-CN' : 'en';
+    document.title = locale === 'zh' ? '果果豆豆打卡' : 'Guoguo Beans';
+  }, [locale]);
+
+  const value = useMemo<I18nValue>(() => {
+    const table = locale === 'en' ? en : zh;
+    const t = (key: MessageKey, vars?: Vars) => fill(table[key], vars);
+    const tr = (message: string) => (locale === 'en' ? (errorEn[message] ?? message) : message);
+    return { locale, setLocale, t, tr };
+  }, [locale]);
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+}
+
+export function useI18n() {
+  const ctx = useContext(I18nContext);
+  if (!ctx) throw new Error('useI18n must be used within I18nProvider');
+  return ctx;
+}
+
+export function LanguageSwitch() {
+  const { locale, setLocale, t } = useI18n();
+  return (
+    <div className="lang-switch" role="group" aria-label={t('language')}>
+      <button type="button" className={locale === 'zh' ? 'active' : ''} onClick={() => setLocale('zh')}>
+        中
+      </button>
+      <button type="button" className={locale === 'en' ? 'active' : ''} onClick={() => setLocale('en')}>
+        EN
+      </button>
+    </div>
+  );
+}
+
+const WEEK_ZH = ['一', '二', '三', '四', '五', '六', '日'];
+const WEEK_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+export function weekdays(locale: Locale) {
+  return locale === 'en' ? WEEK_EN : WEEK_ZH;
+}
+
+export function formatMonth(month: string, locale: Locale) {
+  const [y, m] = month.split('-').map(Number);
+  if (locale === 'en') {
+    return new Date(y, m - 1, 1).toLocaleString('en', { month: 'long', year: 'numeric' });
+  }
+  return `${y}年${m}月`;
+}
+
+export function tagDisplayName(tag: { name: string; systemKey?: string | null }, missedLabel: string) {
+  return tag.systemKey === 'missed_day' ? missedLabel : tag.name;
+}

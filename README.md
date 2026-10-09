@@ -1,94 +1,94 @@
-# 果果豆豆打卡
+English | [简体中文](README.zh-CN.md)
 
-家庭行为打卡与豆豆奖励 Web 应用。支持多人档案、后端同步、月历打卡、彩色豆豆进度（10 小豆 = 1 大豆）、奖励兑换与月度总结。面向 Android 触屏优化，可安装为 PWA。
+# Guoguo Beans
 
-## 快速开始
+A family check-in and bean-reward web app. Multiple child profiles, server sync, a monthly calendar, colored bean progress (10 small beans = 1 big bean), rewards, and a monthly summary. Tuned for Android touch screens and installable as a PWA.
+
+## Quick start
 
 ```bash
 npm install
 npm run db:push -w @guoguo/server
 npm run build -w @guoguo/shared
 
-# 终端 1：API
+# Terminal 1: API
 npm run dev:server
 
-# 终端 2：前端
+# Terminal 2: web
 npm run dev:web
 ```
 
-- 前端：[http://localhost:5180](http://localhost:5180)  
-- API：[http://localhost:3001](http://localhost:3001)
+- Web: [http://localhost:5180](http://localhost:5180)
+- API: [http://localhost:3001](http://localhost:3001)
 
-在同一局域网 Android 设备上访问电脑的 `http://<电脑IP>:5180` 即可。
+On the same Wi-Fi, open `http://<computer-ip>:5180` from an Android device.
 
-开发调试才需要上面两个终端。家里平时用下面的「开启服务」，不要和 `npm run dev:server` 一起开，否则会抢 3001 端口。
+Those two terminals are for development. Day-to-day use is the packaged service below. Do not run it together with `npm run dev:server`, or they will fight over port 3001.
 
-## 开启服务
+## Start the household service
 
-家里用的是打包后的服务：网页和接口都在 **3001**，数据是 `apps/server/.env` 里的库（当前为 `apps/server/prisma/dev.db`）。
+The packaged server serves both the site and the API on **port 3001**. Data lives in the database named by `apps/server/.env` (currently `apps/server/prisma/dev.db`).
 
-开机登录后约 20 秒会自动开（计划任务名 `Guoguo`）。没开起来，或改完代码要重新开，在项目根目录执行：
+About 20 seconds after Windows sign-in, scheduled task `Guoguo` starts it. If it is down, or you changed the code and need a restart, run this from the repo root:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-guoguo.ps1
 ```
 
-脚本会做这些事：
+The script:
 
-- 源码比现有打包新时，先更新数据库结构并重新构建，再停掉旧的打包进程
-- 启动 `apps/server/dist/index.js`
-- 3001 已经有别的程序占用时（例如另一个 `npm run dev:server`），这次启动会跳过
+- updates the database schema and rebuilds when source is newer than the current build, then stops the old packaged process
+- starts `apps/server/dist/index.js`
+- skips the start if something else already owns port 3001 (for example `npm run dev:server`)
 
-浏览器打开 [http://localhost:3001](http://localhost:3001)。手机同一 Wi-Fi 下打开 `http://<电脑IP>:3001`。
+Open [http://localhost:3001](http://localhost:3001). On a phone on the same Wi-Fi, open `http://<computer-ip>:3001`.
 
-日志在 `logs/guoguo.log`。换了电脑或计划任务丢了，再注册一次开机自启：
+Logs are in `logs/guoguo.log`. On a new computer, or if the scheduled task is gone, register autostart again:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-autostart.ps1
 ```
 
-## 功能
+## Features
 
-- 家庭账号注册/登录，多孩子档案切换
-- 可编辑行为标签（颜色、达标豆数）
-- 月历打卡，同日同标签显示 x2 / x3
-- 顶栏小豆进度条按标签颜色染色；集满 10 颗合成大豆（动画 + 音效）
-- 奖励表（照片、小豆/大豆混合定价、兑换）
-- 月度总结：打卡成就 + 兑奖相册
+- Family account (register / sign in) and multiple child profiles
+- Editable behavior tags (color and bean amount)
+- Monthly calendar; the same tag on the same day shows x2 / x3
+- Top bar colors small beans by tag; 10 small beans merge into one big bean (animation and sound)
+- Reward list (photo, mixed small/big bean prices, redeem)
+- Monthly summary: check-in achievements and a redeem album
 
-## 功能迭代
+## Changelog
 
 ### 2026-10-07
 
-- **未打卡扣豆**：第一次打卡之后，已经过去却没打卡的日子自动扣豆。扣豆标签里有一条深红色、不能删除的「未打卡扣豆」，默认为 10 小豆（1 大豆），改成 0 则不生效。扣完手里的豆还不够时，扣到 0 并进入危险模式。
+- **Missed check-in:** after the first check-in, each past day with no check-in deducts beans automatically. The deduct-tag list has a dark-red entry that cannot be deleted. Default is 10 small beans (1 big bean); set it to 0 to turn the charge off. If the charge is larger than the remaining beans, the balance goes to 0 and danger mode starts. See [docs/iterations/2026-10-07-未打卡扣豆.md](docs/iterations/2026-10-07-未打卡扣豆.md) (Chinese).
 
 ### 2026-09-30
 
-- **扣豆标签**：打卡弹层左加豆、右扣豆；扣豆不乘开心日倍率；余额 ≤ -5 时豆条锁定（与危险日同一套）。详见 [docs/iterations/2026-09-30-扣豆标签.md](docs/iterations/2026-09-30-扣豆标签.md)。
-- **危险日历**：字号加大、窄屏可左右滑；危险日中间显示门槛、底部 `已加/门槛`；达标浅绿，凌晨未加满则锁定并略加深红。需满只计加豆，兑奖不算。详见 [docs/iterations/2026-09-30-危险日历.md](docs/iterations/2026-09-30-危险日历.md)。
-
-
+- **Deduct tags:** the check-in sheet puts plus tags on the left and deduct tags on the right. Deducts do not use the happy-day multiplier. At a balance of −5 or lower, the bean bar locks (same lock as a danger day). See [docs/iterations/2026-09-30-扣豆标签.md](docs/iterations/2026-09-30-扣豆标签.md).
+- **Danger calendar:** larger type, horizontal swipe on narrow screens. A danger day shows the threshold in the middle and `earned/threshold` at the bottom. Meeting the goal turns the cell light green; missing it by dawn locks the day and deepens the red. Only beans earned that day count; redemptions do not. See [docs/iterations/2026-09-30-危险日历.md](docs/iterations/2026-09-30-危险日历.md).
 
 ### 2026-09-29
 
-- **探宝日历**：月历改成盲盒探宝（开心日倍率 / 危险日门槛 / 危险模式锁兑奖）。详见 [docs/iterations/2026-09-29-探宝日历.md](docs/iterations/2026-09-29-探宝日历.md)。
-- **豆豆入账**：打卡实际发豆数和加减流水写入数据库。详见 [docs/iterations/2026-09-29-豆豆入账.md](docs/iterations/2026-09-29-豆豆入账.md)。
-- **盲盒美化**：日历格做成淡色包装盒卡片（十字缎带、无礼盒图标）、当天「今」标。详见 [docs/iterations/2026-09-29-盲盒美化.md](docs/iterations/2026-09-29-盲盒美化.md)。
-- **打卡倍率显示**：开心日标签行显示「原豆 × 倍率 ≈ 实得」，不直接改成四舍五入后的豆数。详见 [docs/iterations/2026-09-29-打卡倍率显示.md](docs/iterations/2026-09-29-打卡倍率显示.md)。
-- 家长 PIN：解锁后可再点锁重新上锁；再次解锁必须再输 PIN（`pinEpoch`）。
-- 奖励照片可裁剪（4:3 拖移/捏合）；兑换成功有动画和提示音。
-- 总结页增加横向兑奖时间轴，相册详情改为卡片尺寸。
-- 标签新增/编辑改为底部弹层；豆数输入清空时视为 0，提交最少 1。
-- 减少豆豆也有音效；暗色模式下卡通豆去掉会糊成黑块的投影。
+- **Quest calendar:** the month is a blind-box quest (happy-day multiplier, danger-day threshold, danger mode locks redemptions). See [docs/iterations/2026-09-29-探宝日历.md](docs/iterations/2026-09-29-探宝日历.md).
+- **Bean ledger:** the beans actually awarded, and the plus/minus history, are stored in the database. See [docs/iterations/2026-09-29-豆豆入账.md](docs/iterations/2026-09-29-豆豆入账.md).
+- **Box look:** calendar cells are pale gift boxes (ribbon cross, no gift icon) with a “today” mark. See [docs/iterations/2026-09-29-盲盒美化.md](docs/iterations/2026-09-29-盲盒美化.md).
+- **Multiplier display:** on a happy day the tag row shows “base × multiplier ≈ awarded” instead of replacing the tag amount with the rounded result. See [docs/iterations/2026-09-29-打卡倍率显示.md](docs/iterations/2026-09-29-打卡倍率显示.md).
+- Parent PIN can be locked again after unlock. The next unlock always asks for the PIN (`pinEpoch`).
+- Reward photos can be cropped (4:3, drag and pinch). A successful redeem plays an animation and a sound.
+- The summary page has a horizontal redeem timeline; album details use card size.
+- Creating and editing a tag uses a bottom sheet. An empty bean field counts as 0; submit requires at least 1.
+- Removing beans plays a sound. In dark mode, cartoon beans drop the shadow that turned into a black blob.
 
+## Build by hand
 
-
-## 手动打包
-
-启动脚本在源码更新时也会做同样的事。需要单独打包时：
+The start script does the same rebuild when source is newer. To build on its own:
 
 ```bash
 npm run build
 ```
 
-服务端会托管 `apps/web/dist`。不要改用另一个数据库文件来启动，否则打卡记录会对不上现在这份 `dev.db`。
+The server hosts `apps/web/dist`. Do not point the server at a different SQLite file, or check-in history will not match the current `dev.db`.
+
+The in-app language switch is stored in the browser (`guoguo_locale`). New families can be created in Chinese or English; existing tag names stay as they were saved.

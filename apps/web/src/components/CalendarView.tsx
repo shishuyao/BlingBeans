@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { BehaviorTagDto, CheckInDto, DayQuestDto, MergeEvent, RevealEvent } from '@guoguo/shared';
 import { ApiError, api } from '../api';
 import { todayStr, useApp } from '../appContext';
+import { useI18n } from '../i18n';
 import { playCheckInSound, playUndoSound } from '../sound';
 import { MonthCalendar } from './MonthCalendar';
 import { DayCheckInSheet } from './DayCheckInSheet';
@@ -9,6 +10,7 @@ import { MysteryReveal } from './MysteryReveal';
 
 export function CalendarView() {
   const { profileId, month, setBeans, enqueueMerges, hasPin, parentUnlocked, ensureParent, refreshBeans } = useApp();
+  const { t, tr } = useI18n();
   const [checkIns, setCheckIns] = useState<CheckInDto[]>([]);
   const [tags, setTags] = useState<BehaviorTagDto[]>([]);
   const [quests, setQuests] = useState<DayQuestDto[]>([]);
@@ -36,7 +38,7 @@ export function CalendarView() {
   }, [profileId, month, refreshBeans]);
 
   useEffect(() => {
-    reload().catch((e) => setError(e.message));
+    reload().catch((e) => setError(e instanceof Error ? e.message : t('checkinFail')));
   }, [reload]);
 
   useEffect(() => {
@@ -48,7 +50,7 @@ export function CalendarView() {
   const onSelectDay = (date: string) => {
     setError('');
     if (date > today) {
-      setHint('这一天还没到，先保持神秘哦');
+      setHint(t('futureHint'));
       return;
     }
     setSheetDate(date);
@@ -80,7 +82,7 @@ export function CalendarView() {
         const unlocked = await ensureParent();
         if (unlocked) return onAdd(tagId);
       }
-      setError(e instanceof Error ? e.message : '打卡失败');
+      setError(e instanceof Error ? e.message : t('checkinFail'));
     } finally {
       setBusy(false);
     }
@@ -99,7 +101,7 @@ export function CalendarView() {
       else playUndoSound();
       await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '撤销失败');
+      setError(e instanceof Error ? e.message : t('undoFail'));
     } finally {
       setBusy(false);
     }
@@ -109,7 +111,7 @@ export function CalendarView() {
 
   return (
     <div>
-      {error ? <div className="error-banner">{error}</div> : null}
+      {error ? <div className="error-banner">{tr(error)}</div> : null}
       {hint ? <div className="hint-banner">{hint}</div> : null}
       <MonthCalendar quests={quests} onSelectDay={onSelectDay} />
       {sheetDate ? (

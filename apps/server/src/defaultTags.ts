@@ -1,7 +1,16 @@
-import { DEFAULT_PENALTY_TAGS, DEFAULT_TAGS, MISSED_CHECKIN_SYSTEM_KEY, MISSED_CHECKIN_TAG } from '@guoguo/shared';
+import {
+  DEFAULT_PENALTY_TAGS,
+  DEFAULT_PENALTY_TAGS_EN,
+  DEFAULT_TAGS,
+  DEFAULT_TAGS_EN,
+  MISSED_CHECKIN_SYSTEM_KEY,
+  MISSED_CHECKIN_TAG,
+} from '@guoguo/shared';
 
-export function defaultTagRows(profileId: string) {
-  const plus = DEFAULT_TAGS.map((t, i) => ({
+export function defaultTagRows(profileId: string, locale: 'zh' | 'en' = 'zh') {
+  const plusTags = locale === 'en' ? DEFAULT_TAGS_EN : DEFAULT_TAGS;
+  const minusTags = locale === 'en' ? DEFAULT_PENALTY_TAGS_EN : DEFAULT_PENALTY_TAGS;
+  const plus = plusTags.map((t, i) => ({
     profileId,
     name: t.name,
     color: t.color,
@@ -9,7 +18,7 @@ export function defaultTagRows(profileId: string) {
     sortOrder: i,
     kind: 'plus',
   }));
-  const minus = DEFAULT_PENALTY_TAGS.map((t, i) => ({
+  const minus = minusTags.map((t, i) => ({
     profileId,
     name: t.name,
     color: t.color,

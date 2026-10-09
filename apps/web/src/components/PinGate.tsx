@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { useApp, type PinModalMode } from '../appContext';
+import { useI18n } from '../i18n';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'] as const;
 
@@ -11,6 +12,7 @@ type Props = {
 
 export function PinGate({ mode, onDone }: Props) {
   const { hasPin } = useApp();
+  const { t, tr } = useI18n();
   const [pin, setPin] = useState('');
   const [oldPin, setOldPin] = useState('');
   const [step, setStep] = useState<'old' | 'new' | 'confirm'>(
@@ -22,23 +24,18 @@ export function PinGate({ mode, onDone }: Props) {
 
   const title =
     mode === 'unlock'
-      ? '家长解锁'
+      ? t('pinUnlockTitle')
       : mode === 'change'
         ? step === 'old'
-          ? '输入旧 PIN'
+          ? t('oldPin')
           : step === 'new'
-            ? '设置新 PIN'
-            : '再输入一次'
+            ? t('newPin')
+            : t('confirmAgain')
         : step === 'confirm'
-          ? '再输入一次确认'
-          : '设置家长 PIN';
+          ? t('confirmSetup')
+          : t('setupPin');
 
-  const subtitle =
-    mode === 'unlock'
-      ? '输入 4 位数字后才能打卡或兑奖'
-      : mode === 'setup'
-        ? '防止小朋友自己乱加豆豆'
-        : '修改后请牢记新 PIN';
+  const subtitle = mode === 'unlock' ? t('unlockHint') : mode === 'setup' ? t('setupHint') : t('changeHint');
 
   const activeValue =
     mode === 'change' && step === 'old'
@@ -69,7 +66,7 @@ export function PinGate({ mode, onDone }: Props) {
         await api.pin.unlock(value);
         onDone(true);
       } catch (e) {
-        setError(e instanceof Error ? e.message : '解锁失败');
+        setError(e instanceof Error ? e.message : t('unlockFail'));
         setPin('');
       } finally {
         setBusy(false);
@@ -87,7 +84,7 @@ export function PinGate({ mode, onDone }: Props) {
         return;
       }
       if (value !== pin) {
-        setError('两次输入不一致');
+        setError(t('pinMismatch'));
         setConfirmPin('');
         setPin('');
         setStep(mode === 'change' ? 'new' : 'new');
@@ -101,7 +98,7 @@ export function PinGate({ mode, onDone }: Props) {
         });
         onDone(true);
       } catch (e) {
-        setError(e instanceof Error ? e.message : '设置失败');
+        setError(e instanceof Error ? e.message : t('setupFail'));
         setPin('');
         setConfirmPin('');
         setOldPin('');
@@ -133,7 +130,7 @@ export function PinGate({ mode, onDone }: Props) {
             <span key={i} className={`pin-dot${i < activeValue.length ? ' filled' : ''}`} />
           ))}
         </div>
-        {error ? <div className="error-banner">{error}</div> : null}
+        {error ? <div className="error-banner">{tr(error)}</div> : null}
         <div className="pin-pad">
           {KEYS.map((key, i) => (
             <button
@@ -148,7 +145,7 @@ export function PinGate({ mode, onDone }: Props) {
           ))}
         </div>
         <button type="button" className="btn btn-ghost" style={{ width: '100%', marginTop: 12 }} onClick={() => onDone(false)} disabled={busy}>
-          取消
+          {t('cancel')}
         </button>
       </div>
     </div>

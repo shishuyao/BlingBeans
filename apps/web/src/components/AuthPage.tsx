@@ -1,16 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { useApp } from '../appContext';
+import { LanguageSwitch, useI18n } from '../i18n';
 
 export function AuthPage() {
   const { refreshMe, setProfileId } = useApp();
+  const { t, tr, locale } = useI18n();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [familyName, setFamilyName] = useState('');
-  const [profileName, setProfileName] = useState('果果');
+  const [profileName, setProfileName] = useState(locale === 'en' ? 'Kid' : '果果');
   const [error, setError] = useState('');
+  useEffect(() => {
+    setProfileName((prev) => {
+      if (locale === 'en' && prev === '果果') return 'Kid';
+      if (locale === 'zh' && prev === 'Kid') return '果果';
+      return prev;
+    });
+  }, [locale]);
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
@@ -22,9 +31,10 @@ export function AuthPage() {
         const res = await api.register({
           email,
           password,
-          name: name || '家长',
+          name: name || t('parentFallback'),
           familyName: familyName || undefined,
-          profileName: profileName || '孩子',
+          profileName: profileName || t('kidFallback'),
+          locale,
         });
         localStorage.setItem('guoguo_profileId', res.profile.id);
         setProfileId(res.profile.id);
@@ -33,7 +43,7 @@ export function AuthPage() {
       }
       await refreshMe();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '操作失败');
+      setError(err instanceof Error ? err.message : t('actionFail'));
     } finally {
       setBusy(false);
     }
@@ -42,29 +52,32 @@ export function AuthPage() {
   return (
     <div className="auth-page">
       <form className="auth-card" onSubmit={submit}>
-        <h1>果果豆豆</h1>
-        <p className="subtitle">行为打卡 · 豆豆奖励</p>
-        {error ? <div className="error-banner">{error}</div> : null}
+        <div className="auth-lang">
+          <LanguageSwitch />
+        </div>
+        <h1>{t('brand')}</h1>
+        <p className="subtitle">{t('subtitle')}</p>
+        {error ? <div className="error-banner">{tr(error)}</div> : null}
 
         {mode === 'register' ? (
           <>
             <div className="form-row">
-              <label>家长昵称</label>
+              <label>{t('parentNickname')}</label>
               <input value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
             <div className="form-row">
-              <label>家庭名称</label>
-              <input value={familyName} onChange={(e) => setFamilyName(e.target.value)} placeholder="可选" />
+              <label>{t('familyName')}</label>
+              <input value={familyName} onChange={(e) => setFamilyName(e.target.value)} placeholder={t('optional')} />
             </div>
             <div className="form-row">
-              <label>第一个孩子名字</label>
+              <label>{t('firstChild')}</label>
               <input value={profileName} onChange={(e) => setProfileName(e.target.value)} required />
             </div>
           </>
         ) : null}
 
         <div className="form-row">
-          <label>邮箱</label>
+          <label>{t('email')}</label>
           <input
             type="email"
             autoComplete="email"
@@ -74,7 +87,7 @@ export function AuthPage() {
           />
         </div>
         <div className="form-row">
-          <label>密码</label>
+          <label>{t('password')}</label>
           <input
             type="password"
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
@@ -86,22 +99,22 @@ export function AuthPage() {
         </div>
 
         <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={busy}>
-          {mode === 'login' ? '登录' : '注册家庭'}
+          {mode === 'login' ? t('login') : t('registerFamily')}
         </button>
 
         <div className="auth-toggle">
           {mode === 'login' ? (
             <>
-              还没有账号？
+              {t('noAccount')}
               <button type="button" onClick={() => setMode('register')}>
-                注册
+                {t('register')}
               </button>
             </>
           ) : (
             <>
-              已有账号？
+              {t('hasAccount')}
               <button type="button" onClick={() => setMode('login')}>
-                登录
+                {t('login')}
               </button>
             </>
           )}

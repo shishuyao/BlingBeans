@@ -2,11 +2,11 @@ import type { DayQuestDto } from '@guoguo/shared';
 import {
   daysInMonth,
   firstWeekday,
-  monthLabel,
   shiftMonth,
   todayStr,
   useApp,
 } from '../appContext';
+import { formatMonth, useI18n, weekdays } from '../i18n';
 
 function DangerBomb({ uid }: { uid: string }) {
   return (
@@ -36,28 +36,31 @@ function DangerBomb({ uid }: { uid: string }) {
   );
 }
 
-const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
-
 type Props = {
   quests: DayQuestDto[];
   onSelectDay: (date: string) => void;
 };
 
-function footer(opts: { mystery: boolean; isFuture: boolean; quest?: DayQuestDto }) {
-  if (opts.isFuture) return '还没到';
-  if (opts.mystery && ((opts.quest?.missedDeducted ?? 0) > 0 || opts.quest?.missedFrozen)) return '未打卡';
-  if (opts.mystery) return '待开';
+function footer(
+  opts: { mystery: boolean; isFuture: boolean; quest?: DayQuestDto },
+  t: (key: 'notYet' | 'missedDay' | 'unopened' | 'beansShort' | 'dangerProgress', vars?: Record<string, string | number>) => string,
+) {
+  if (opts.isFuture) return t('notYet');
+  if (opts.mystery && ((opts.quest?.missedDeducted ?? 0) > 0 || opts.quest?.missedFrozen)) return t('missedDay');
+  if (opts.mystery) return t('unopened');
   const q = opts.quest;
   if (!q) return '';
   if (q.kind === 'happy') {
-    if (q.beansEarned !== 0) return `${q.beansEarned}豆`;
+    if (q.beansEarned !== 0) return t('beansShort', { n: q.beansEarned });
     return '';
   }
-  return `${q.beansAdded}/${q.dangerNeed}豆`;
+  return t('dangerProgress', { added: q.beansAdded, need: q.dangerNeed });
 }
 
 export function MonthCalendar({ quests, onSelectDay }: Props) {
   const { month, setMonth, selectedDate, setSelectedDate } = useApp();
+  const { t, locale } = useI18n();
+  const labels = weekdays(locale);
   const today = todayStr();
   const total = daysInMonth(month);
   const offset = firstWeekday(month);
@@ -75,16 +78,16 @@ export function MonthCalendar({ quests, onSelectDay }: Props) {
         <button
           className="icon-btn"
           type="button"
-          aria-label="上个月"
+          aria-label={t('prevMonth')}
           onClick={() => setMonth(shiftMonth(month, -1))}
         >
           ‹
         </button>
-        <h2>{monthLabel(month)}</h2>
+        <h2>{formatMonth(month, locale)}</h2>
         <button
           className="icon-btn"
           type="button"
-          aria-label="下个月"
+          aria-label={t('nextMonth')}
           onClick={() => setMonth(shiftMonth(month, 1))}
         >
           ›
@@ -92,7 +95,7 @@ export function MonthCalendar({ quests, onSelectDay }: Props) {
       </div>
       <div className="cal-board">
       <div className="weekday-row">
-        {WEEKDAYS.map((w) => (
+        {labels.map((w) => (
           <div key={w} className="weekday">
             {w}
           </div>
@@ -141,7 +144,7 @@ export function MonthCalendar({ quests, onSelectDay }: Props) {
             >
               <span className="day-head">
                 <span className="day-num">{day}</span>
-                {isToday ? <span className="today-mark">今</span> : null}
+                {isToday ? <span className="today-mark">{t('todayMark')}</span> : null}
               </span>
               {revealed && quest?.kind === 'danger' ? <DangerBomb uid={`bomb-${date}`} /> : null}
               <span className="day-art">
@@ -153,13 +156,13 @@ export function MonthCalendar({ quests, onSelectDay }: Props) {
                 ) : null}
                 {revealed && quest?.kind === 'danger' ? (
                   <span className="day-need">
-                    <span className="day-need-label">需</span>
+                    <span className="day-need-label">{t('needLabel')}</span>
                     {quest.dangerNeed}
                   </span>
                 ) : null}
               </span>
               <span className={`day-caption${mystery ? '' : quest?.kind === 'danger' ? ' danger' : ' happy'}`}>
-                {footer({ mystery, isFuture, quest })}
+                {footer({ mystery, isFuture, quest }, t)}
               </span>
             </button>
           );

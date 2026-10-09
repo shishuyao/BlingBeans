@@ -1,22 +1,29 @@
 import { useMemo, useState } from 'react';
 import type { RedemptionDto } from '@guoguo/shared';
 import { formatDate, todayStr } from '../appContext';
+import { useI18n, type MessageKey } from '../i18n';
 
-function costLabel(r: { costBig: number; costSmall: number }) {
-  const parts: string[] = [];
-  if (r.costBig) parts.push(`${r.costBig} 大豆`);
-  if (r.costSmall) parts.push(`${r.costSmall} 小豆`);
-  return parts.join(' + ') || '免费';
+function useCostLabel() {
+  const { t } = useI18n();
+  return (r: { costBig: number; costSmall: number }) => {
+    const parts: string[] = [];
+    if (r.costBig) parts.push(t('costBig', { n: r.costBig }));
+    if (r.costSmall) parts.push(t('costSmall', { n: r.costSmall }));
+    return parts.join(' + ') || t('free');
+  };
 }
 
-function dateHeading(key: string) {
-  if (key === todayStr()) return '今天';
-  const yest = new Date();
-  yest.setDate(yest.getDate() - 1);
-  if (key === formatDate(yest)) return '昨天';
-  const [y, m, d] = key.split('-');
-  const thisYear = new Date().getFullYear() === Number(y);
-  return thisYear ? `${Number(m)}月${Number(d)}日` : `${y}年${Number(m)}月${Number(d)}日`;
+function useDateHeading() {
+  const { t } = useI18n();
+  return (key: string) => {
+    if (key === todayStr()) return t('today');
+    const yest = new Date();
+    yest.setDate(yest.getDate() - 1);
+    if (key === formatDate(yest)) return t('yesterday');
+    const [y, m, d] = key.split('-');
+    const thisYear = new Date().getFullYear() === Number(y);
+    return thisYear ? t('monthDay', { m: Number(m), d: Number(d) }) : t('yearMonthDay', { y, m: Number(m), d: Number(d) });
+  };
 }
 
 function timeLabel(iso: string) {
@@ -24,9 +31,10 @@ function timeLabel(iso: string) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function fullDateTime(iso: string) {
+function fullDateTime(iso: string, heading: (key: string) => string) {
   const d = new Date(iso);
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${timeLabel(iso)}`;
+  const key = formatDate(d);
+  return `${heading(key)} ${timeLabel(iso)}`;
 }
 
 type DayGroup = { date: string; items: RedemptionDto[] };
@@ -36,7 +44,10 @@ type Props = {
   emptyHint?: string;
 };
 
-export function RedeemTimeline({ redemptions, emptyHint = '还没有兑换记录' }: Props) {
+export function RedeemTimeline({ redemptions, emptyHint }: Props) {
+  const { t } = useI18n();
+  const dateHeading = useDateHeading();
+  const hint = emptyHint ?? t('noRedeemsEver');
   const [openItems, setOpenItems] = useState<RedemptionDto[] | null>(null);
 
   const groups = useMemo<DayGroup[]>(() => {
@@ -57,9 +68,9 @@ export function RedeemTimeline({ redemptions, emptyHint = '还没有兑换记录
 
   return (
     <div className="panel">
-      <h3>兑换时间轴</h3>
+      <h3>{t('timelineTitle')}</h3>
       {groups.length === 0 ? (
-        <p className="empty-hint">{emptyHint}</p>
+        <p className="empty-hint">{hint}</p>
       ) : (
         <div className="tl-scroller">
           <ol className="tl">
@@ -74,7 +85,7 @@ export function RedeemTimeline({ redemptions, emptyHint = '还没有兑换记录
                     type="button"
                     className={`tl-stack${g.items.length > 1 ? ' multi' : ''}`}
                     onClick={() => setOpenItems(g.items)}
-                    aria-label={`${dateHeading(g.date)}的兑换，共${g.items.length}张`}
+                    aria-label={t('timelineAria', { date: dateHeading(g.date), n: g.items.length })}
                   >
                     {preview.map((item, i) => (
                       <div
@@ -87,11 +98,11 @@ export function RedeemTimeline({ redemptions, emptyHint = '还没有兑换记录
                         ) : (
                           <div className="tl-card-empty">🎁</div>
                         )}
-                        <div className="tl-card-cap">{item.reward?.title ?? '奖励'}</div>
+                        <div className="tl-card-cap">{item.reward?.title ?? t('rewardFallback')}</div>
                       </div>
                     ))}
                     {extra > 0 ? <span className="tl-more">+{extra}</span> : null}
-                    {g.items.length > 1 ? <span className="tl-count">{g.items.length} 张</span> : null}
+                    {g.items.length > 1 ? <span className="tl-count">{t('sheets', { n: g.items.length })}</span> : null}
                   </button>
                 </li>
               );
@@ -105,19 +116,24 @@ export function RedeemTimeline({ redemptions, emptyHint = '还没有兑换记录
   );
 }
 
-function galleryTitle(items: RedemptionDto[]) {
-  if (items.length === 0) return '兑换相册';
-  const names = new Set(items.map((row) => row.reward?.title ?? '奖励'));
+function galleryTitle(
+  items: RedemptionDto[],
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string,
+  dateHeading: (key: string) => string,
+) {
+  const fallback = t('rewardFallback');
+  if (items.length === 0) return t('albumTitle');
+  const names = new Set(items.map((row) => row.reward?.title ?? fallback));
   if (names.size === 1) {
     const [name] = names;
-    return items.length > 1 ? `${name} · ${items.length} 次` : name;
+    return items.length > 1 ? t('albumCount', { name, n: items.length }) : name;
   }
   const keys = new Set(items.map((row) => formatDate(new Date(row.redeemedAt))));
   if (keys.size === 1) {
     const [only] = keys;
-    return `${dateHeading(only)} · ${items.length} 张`;
+    return t('albumDay', { date: dateHeading(only), n: items.length });
   }
-  return `兑换相册 · ${items.length} 张`;
+  return t('albumTotal', { n: items.length });
 }
 
 export function RedeemDetailSheet({
@@ -127,8 +143,11 @@ export function RedeemDetailSheet({
   items: RedemptionDto[];
   onClose: () => void;
 }) {
+  const { t } = useI18n();
+  const dateHeading = useDateHeading();
+  const costLabel = useCostLabel();
   if (items.length === 0) return null;
-  const title = galleryTitle(items);
+  const title = galleryTitle(items, t, dateHeading);
 
   return (
     <>
@@ -143,14 +162,14 @@ export function RedeemDetailSheet({
               ) : (
                 <div className="tl-gallery-empty">🎁</div>
               )}
-              <div className="tl-gallery-cap">{item.reward?.title ?? '奖励'}</div>
-              <div className="tl-gallery-meta">{fullDateTime(item.redeemedAt)}</div>
-              <div className="tl-gallery-cost">花费 {costLabel(item)}</div>
+              <div className="tl-gallery-cap">{item.reward?.title ?? t('rewardFallback')}</div>
+              <div className="tl-gallery-meta">{fullDateTime(item.redeemedAt, dateHeading)}</div>
+              <div className="tl-gallery-cost">{t('spent', { cost: costLabel(item) })}</div>
             </article>
           ))}
         </div>
         <button type="button" className="btn btn-ghost" style={{ width: '100%', marginTop: 14 }} onClick={onClose}>
-          关闭
+          {t('close')}
         </button>
       </div>
     </>

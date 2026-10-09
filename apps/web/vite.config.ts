@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: '果果豆豆打卡',
-        short_name: '豆豆打卡',
-        description: '行为打卡与豆豆奖励',
+        name: 'Guoguo Beans',
+        short_name: 'Guoguo',
+        description: 'Family check-in and bean rewards',
         theme_color: '#2D6A4F',
         background_color: '#F7F3E9',
         display: 'standalone',

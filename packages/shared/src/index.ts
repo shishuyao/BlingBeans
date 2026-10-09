@@ -37,6 +37,19 @@ export const DEFAULT_PENALTY_TAGS = [
   { name: '没礼貌', color: '#F9A825', beansOnComplete: 1 },
 ] as const;
 
+export const DEFAULT_TAGS_EN = [
+  { name: 'No complaints', color: '#4CAF50', beansOnComplete: 1 },
+  { name: 'Focused 20 minutes', color: '#2196F3', beansOnComplete: 2 },
+  { name: 'Kind to friends', color: '#FF9800', beansOnComplete: 1 },
+  { name: 'Clear thinking', color: '#9C27B0', beansOnComplete: 2 },
+] as const;
+
+export const DEFAULT_PENALTY_TAGS_EN = [
+  { name: 'Tantrum', color: '#E53935', beansOnComplete: 2 },
+  { name: 'Not listening', color: '#FB8C00', beansOnComplete: 1 },
+  { name: 'Rude', color: '#F9A825', beansOnComplete: 1 },
+] as const;
+
 /** Undeletable penalty tag. Amount is small beans; 10 = one big bean. 0 disables it. */
 export const MISSED_CHECKIN_SYSTEM_KEY = 'missed_day';
 

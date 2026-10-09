@@ -2,18 +2,19 @@ import { useEffect, useState } from 'react';
 import { canAfford, type RewardDto } from '@guoguo/shared';
 import { api } from '../api';
 import { useApp } from '../appContext';
+import { useI18n } from '../i18n';
 import { ImageCropper } from './ImageCropper';
 import { RedeemCelebration } from './RedeemCelebration';
 
-function costLabel(r: { costBig: number; costSmall: number }) {
-  const parts: string[] = [];
-  if (r.costBig) parts.push(`${r.costBig} 大豆`);
-  if (r.costSmall) parts.push(`${r.costSmall} 小豆`);
-  return parts.join(' + ') || '免费';
-}
-
 export function RewardsPanel() {
   const { profileId, beans, setBeans } = useApp();
+  const { t, tr } = useI18n();
+  const costLabel = (r: { costBig: number; costSmall: number }) => {
+    const parts: string[] = [];
+    if (r.costBig) parts.push(t('costBig', { n: r.costBig }));
+    if (r.costSmall) parts.push(t('costSmall', { n: r.costSmall }));
+    return parts.join(' + ') || t('free');
+  };
   const [rewards, setRewards] = useState<RewardDto[]>([]);
   const [title, setTitle] = useState('');
   const [costBig, setCostBig] = useState(0);
@@ -32,7 +33,7 @@ export function RewardsPanel() {
   };
 
   useEffect(() => {
-    load().catch((e) => setError(e.message));
+    load().catch((e) => setError(e instanceof Error ? e.message : t('saveFail')));
   }, [profileId]);
 
   const resetForm = () => {
@@ -55,7 +56,7 @@ export function RewardsPanel() {
       const { url } = await api.upload(file);
       setPhotoUrl(url);
     } catch (e) {
-      setError(e instanceof Error ? e.message : '上传失败');
+      setError(e instanceof Error ? e.message : t('uploadFail'));
     } finally {
       setBusy(false);
     }
@@ -69,7 +70,7 @@ export function RewardsPanel() {
   const submit = async () => {
     if (!profileId || !title.trim()) return;
     if (costBig === 0 && costSmall === 0) {
-      setError('请设置兑换价格');
+      setError(t('setPrice'));
       return;
     }
     setBusy(true);
@@ -94,7 +95,7 @@ export function RewardsPanel() {
       resetForm();
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存失败');
+      setError(e instanceof Error ? e.message : t('saveFail'));
     } finally {
       setBusy(false);
     }
@@ -104,10 +105,10 @@ export function RewardsPanel() {
 
   const redeem = async (reward: RewardDto) => {
     if (dangerLocked) {
-      setError('危险模式中，先打卡攒够豆再兑奖');
+      setError(t('dangerBanner'));
       return;
     }
-    if (!confirm(`确认兑换「${reward.title}」？`)) return;
+    if (!confirm(t('redeemConfirm', { title: reward.title }))) return;
     setBusy(true);
     setError('');
     try {
@@ -116,24 +117,24 @@ export function RewardsPanel() {
       setCelebrating(reward);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '兑换失败');
+      setError(e instanceof Error ? e.message : t('redeemFail'));
     } finally {
       setBusy(false);
     }
   };
 
   const remove = async (reward: RewardDto) => {
-    if (!confirm(`删除奖励「${reward.title}」？`)) return;
+    if (!confirm(t('deleteRewardConfirm', { title: reward.title }))) return;
     await api.rewards.remove(reward.id);
     await load();
   };
 
   return (
     <div>
-      {error ? <div className="error-banner">{error}</div> : null}
+      {error ? <div className="error-banner">{tr(error)}</div> : null}
       {dangerLocked ? (
         <div className="danger-mode-banner" style={{ marginBottom: 12 }}>
-          危险模式锁定兑奖 · 今天打卡超过 5 颗豆即可解锁
+          {t('dangerRedeemBanner')}
         </div>
       ) : null}
 
@@ -146,20 +147,20 @@ export function RewardsPanel() {
             setShowForm(true);
           }}
         >
-          ＋ 添加奖励
+          {t('addReward')}
         </button>
       </div>
 
       {showForm ? (
         <div className="panel">
-          <h3>{editing ? '编辑奖励' : '新建奖励'}</h3>
+          <h3>{editing ? t('editReward') : t('newReward')}</h3>
           <div className="form-row">
-            <label>名称</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：一次冰淇淋" />
+            <label>{t('nameLabel')}</label>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('exampleIceCream')} />
           </div>
           <div className="form-inline">
             <div className="form-row" style={{ flex: 1 }}>
-              <label>大豆豆</label>
+              <label>{t('bigBeansLabel')}</label>
               <input
                 type="number"
                 min={0}
@@ -168,7 +169,7 @@ export function RewardsPanel() {
               />
             </div>
             <div className="form-row" style={{ flex: 1 }}>
-              <label>小豆豆</label>
+              <label>{t('smallBeansLabel')}</label>
               <input
                 type="number"
                 min={0}
@@ -179,7 +180,7 @@ export function RewardsPanel() {
             </div>
           </div>
           <div className="form-row">
-            <label>照片</label>
+            <label>{t('photo')}</label>
             <input
               type="file"
               accept="image/*"
@@ -190,22 +191,22 @@ export function RewardsPanel() {
               }}
             />
             {photoUrl ? (
-              <img src={photoUrl} alt="预览" style={{ marginTop: 8, borderRadius: 12, maxHeight: 140, objectFit: 'cover' }} />
+              <img src={photoUrl} alt={t('preview')} style={{ marginTop: 8, borderRadius: 12, maxHeight: 140, objectFit: 'cover' }} />
             ) : null}
           </div>
           <div className="form-inline">
             <button type="button" className="btn btn-primary" disabled={busy} onClick={submit}>
-              保存
+              {t('save')}
             </button>
             <button type="button" className="btn btn-ghost" onClick={resetForm}>
-              取消
+              {t('cancel')}
             </button>
           </div>
         </div>
       ) : null}
 
       <div className="reward-grid">
-        {rewards.length === 0 ? <p className="empty-hint" style={{ gridColumn: '1 / -1' }}>还没有奖励，点上方添加</p> : null}
+        {rewards.length === 0 ? <p className="empty-hint" style={{ gridColumn: '1 / -1' }}>{t('noRewards')}</p> : null}
         {rewards.map((r) => {
           const affordable = beans ? canAfford(beans, r) : false;
           return (
@@ -224,7 +225,7 @@ export function RewardsPanel() {
                   disabled={busy || !affordable || dangerLocked}
                   onClick={() => redeem(r)}
                 >
-                  {dangerLocked ? '已锁定' : '兑换'}
+                  {dangerLocked ? t('locked') : t('redeem')}
                 </button>
                 <div className="form-inline">
                   <button
@@ -240,7 +241,7 @@ export function RewardsPanel() {
                       setShowForm(true);
                     }}
                   >
-                    编辑
+                    {t('edit')}
                   </button>
                   <button
                     type="button"
@@ -248,7 +249,7 @@ export function RewardsPanel() {
                     style={{ flex: 1, minHeight: 40 }}
                     onClick={() => remove(r)}
                   >
-                    删
+                    {t('delete')}
                   </button>
                 </div>
               </div>

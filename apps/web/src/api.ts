@@ -22,6 +22,11 @@ export class ApiError extends Error {
   }
 }
 
+function requestFail(status: number) {
+  const en = typeof localStorage !== 'undefined' && localStorage.getItem('guoguo_locale') === 'en';
+  return en ? `Request failed (${status})` : `请求失败 (${status})`;
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const isForm = options?.body instanceof FormData;
   const hasJsonBody = options?.body != null && !isForm;
@@ -39,7 +44,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     const message =
       body.error && body.error !== 'Bad Request'
         ? body.error
-        : body.message ?? body.error ?? `请求失败 (${res.status})`;
+        : body.message ?? body.error ?? requestFail(res.status);
     throw new ApiError(message, res.status, body.code);
   }
   return data as T;
@@ -67,6 +72,7 @@ export const api = {
     name: string;
     familyName?: string;
     profileName?: string;
+    locale?: 'zh' | 'en';
   }) => request<MeResponse & { profile: ProfileDto }>('/api/auth/register', { method: 'POST', body: JSON.stringify(body) }),
 
   login: (body: { email: string; password: string }) =>
@@ -97,7 +103,7 @@ export const api = {
 
   profiles: {
     list: () => request<ProfileDto[]>('/api/profiles'),
-    create: (body: { name: string; avatarColor?: string }) =>
+    create: (body: { name: string; avatarColor?: string; locale?: 'zh' | 'en' }) =>
       request<ProfileDto>('/api/profiles', { method: 'POST', body: JSON.stringify(body) }),
     update: (id: string, body: Partial<Pick<ProfileDto, 'name' | 'avatarColor' | 'sortOrder'>>) =>
       request<ProfileDto>(`/api/profiles/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

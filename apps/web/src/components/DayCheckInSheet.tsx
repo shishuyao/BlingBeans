@@ -5,6 +5,7 @@ import {
   type CheckInDto,
   type DayQuestDto,
 } from '@guoguo/shared';
+import { useI18n } from '../i18n';
 
 type Props = {
   date: string;
@@ -39,10 +40,11 @@ function TagRows({
   onAdd: (tagId: string) => void;
   onRemove: (tagId: string) => void;
 }) {
+  const { t } = useI18n();
   if (tags.length === 0) {
     return (
       <p className="empty-hint sheet-col-empty">
-        {variant === 'plus' ? '还没有加豆标签' : '还没有扣豆标签'}
+        {variant === 'plus' ? t('noPlusTags') : t('noMinusTags')}
       </p>
     );
   }
@@ -87,7 +89,9 @@ function TagRows({
                 <span className="tag-award">+{award}</span>
               </span>
             ) : (
-              <span className="tag-meta">{minus ? `−${award}豆` : `+${award}豆`}</span>
+              <span className="tag-meta">
+                {minus ? `−${t('beansShort', { n: award })}` : `+${t('beansShort', { n: award })}`}
+              </span>
             )}
             {!hideActions ? (
               <div className="tag-actions">
@@ -96,7 +100,7 @@ function TagRows({
                   className="mini-btn"
                   disabled={busy || count === 0}
                   onClick={() => onRemove(tag.id)}
-                  aria-label="减少一次"
+                  aria-label={t('undoOnce')}
                 >
                   −
                 </button>
@@ -105,7 +109,7 @@ function TagRows({
                   className={`mini-btn plus${minus ? ' warn' : ''}`}
                   disabled={busy}
                   onClick={() => onAdd(tag.id)}
-                  aria-label={minus ? '扣豆' : '打卡'}
+                  aria-label={minus ? t('deduct') : t('checkIn')}
                 >
                   +
                 </button>
@@ -113,7 +117,7 @@ function TagRows({
             ) : count > 0 ? (
               <span className="tag-count">×{count}</span>
             ) : (
-              <span className="tag-meta">{minus ? '未扣' : '未打卡'}</span>
+              <span className="tag-meta">{minus ? t('notDeducted') : t('notChecked')}</span>
             )}
           </div>
         );
@@ -139,29 +143,30 @@ export function DayCheckInSheet({
   const plusTags = activeTags.filter((t) => t.kind !== 'minus');
   const minusTags = activeTags.filter((t) => t.kind === 'minus' && !isMissedCheckInTag(t));
   const countMap = new Map(checkIns.filter((c) => c.date === date).map((c) => [c.tagId, c.count]));
+  const { t } = useI18n();
   const [, , day] = date.split('-');
-  const title = `${Number(date.slice(5, 7))}月${Number(day)}日打卡`;
+  const title = t('checkinTitle', { month: Number(date.slice(5, 7)), day: Number(day) });
   const hideActions = Boolean(locked || readOnly);
 
   const questBanner = (() => {
     if (!quest?.revealed) return null;
     if (quest.kind === 'happy') {
-      return <div className="quest-banner happy">开心日 · 豆豆 ×{quest.multiplier.toFixed(1)}</div>;
+      return <div className="quest-banner happy">{t('happyBanner', { mult: quest.multiplier.toFixed(1) })}</div>;
     }
     if (quest.settled) {
       return quest.beansAdded >= quest.dangerNeed ? (
         <div className="quest-banner danger ok">
-          危险日过关 · 今日加豆 {quest.beansAdded}/{quest.dangerNeed}
+          {t('dangerPass', { added: quest.beansAdded, need: quest.dangerNeed })}
         </div>
       ) : (
         <div className="quest-banner danger">
-          危险日未过关 · 已扣除 {quest.dangerNeed} 豆
+          {t('dangerFail', { need: quest.dangerNeed })}
         </div>
       );
     }
     return (
       <div className="quest-banner danger">
-        危险日 · 今天要加满 {quest.dangerNeed} 颗（已加 {quest.beansAdded}，兑奖不算）
+        {t('dangerToday', { need: quest.dangerNeed, added: quest.beansAdded })}
       </div>
     );
   })();
@@ -174,22 +179,22 @@ export function DayCheckInSheet({
         {questBanner}
         {readOnly ? (
           <div className="lock-hint">
-            <p>这一天已经过去，只能看看，不能再改哦</p>
+            <p>{t('pastReadOnly')}</p>
           </div>
         ) : locked ? (
           <div className="lock-hint">
-            <p>当前是孩子模式，不能自己加减豆豆</p>
+            <p>{t('kidModeHint')}</p>
             <button type="button" className="btn btn-primary" onClick={onUnlock}>
-              家长解锁
+              {t('parentUnlock')}
             </button>
           </div>
         ) : null}
         {activeTags.length === 0 ? (
-          <p className="empty-hint">还没有行为标签，请先去「标签」页添加</p>
+          <p className="empty-hint">{t('noBehaviorTags')}</p>
         ) : (
           <div className="sheet-split">
             <section className="sheet-col plus">
-              <h4>加豆</h4>
+              <h4>{t('plusCol')}</h4>
               <TagRows
                 tags={plusTags}
                 countMap={countMap}
@@ -202,7 +207,7 @@ export function DayCheckInSheet({
               />
             </section>
             <section className="sheet-col minus">
-              <h4>扣豆</h4>
+              <h4>{t('minusCol')}</h4>
               <TagRows
                 tags={minusTags}
                 countMap={countMap}
@@ -217,7 +222,7 @@ export function DayCheckInSheet({
           </div>
         )}
         <button type="button" className="btn btn-ghost" style={{ width: '100%', marginTop: 14 }} onClick={onClose}>
-          关闭
+          {t('close')}
         </button>
       </div>
     </>

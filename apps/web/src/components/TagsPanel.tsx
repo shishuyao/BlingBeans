@@ -8,9 +8,11 @@ import {
 } from '@guoguo/shared';
 import { api } from '../api';
 import { useApp } from '../appContext';
+import { tagDisplayName, useI18n } from '../i18n';
 
 export function TagsPanel() {
   const { profileId } = useApp();
+  const { t, tr } = useI18n();
   const [tags, setTags] = useState<BehaviorTagDto[]>([]);
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>(TAG_COLORS[0]);
@@ -75,7 +77,7 @@ export function TagsPanel() {
   const submit = async () => {
     if (!profileId || !name.trim()) return;
     if (!editingMissed && beans < 1) {
-      setError(kind === 'minus' ? '扣豆数至少为 1' : '达标豆豆数至少为 1');
+      setError(kind === 'minus' ? t('tagMinMinus') : t('tagMinPlus'));
       return;
     }
     setLoading(true);
@@ -104,7 +106,7 @@ export function TagsPanel() {
       closeForm();
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存失败');
+      setError(e instanceof Error ? e.message : t('saveFail'));
     } finally {
       setLoading(false);
     }
@@ -112,7 +114,7 @@ export function TagsPanel() {
 
   const remove = async (tag: BehaviorTagDto) => {
     if (isMissedCheckInTag(tag)) return;
-    if (!confirm(`删除标签「${tag.name}」？历史打卡会保留。`)) return;
+    if (!confirm(t('deleteTagConfirm', { name: tagDisplayName(tag, t('missedTagName')) }))) return;
     await api.tags.remove(tag.id);
     if (editing?.id === tag.id) closeForm();
     await load();
@@ -124,26 +126,28 @@ export function TagsPanel() {
   const beanMax = editingMissed ? 100 : 20;
 
   const missedLabel = (n: number) => {
-    if (n <= 0) return '已关闭 · 漏打卡不扣豆';
+    if (n <= 0) return t('missedOff');
     const big = n / 10;
-    const bigText = Number.isInteger(big) ? `${big} 大豆` : `${big.toFixed(1)} 大豆`;
-    return `漏打卡一天 −${n} 小豆（${bigText}）`;
+    const bigText = Number.isInteger(big)
+      ? t('bigBeansExact', { n: big })
+      : t('bigBeansDecimal', { n: big.toFixed(1) });
+    return t('missedDayLine', { n, big: bigText });
   };
 
   const plusTags = tags.filter((t) => t.kind !== 'minus');
   const minusTags = tags.filter((t) => t.kind === 'minus');
   const formTitle = editing
     ? kind === 'minus'
-      ? '编辑扣豆标签'
-      : '编辑加豆标签'
+      ? t('editMinus')
+      : t('editPlus')
     : kind === 'minus'
-      ? '新增扣豆标签'
-      : '新增加豆标签';
+      ? t('newMinus')
+      : t('newPlus');
 
   const renderList = (list: BehaviorTagDto[], variant: TagKind) => (
     <div className="manage-list">
       {list.length === 0 ? (
-        <p className="empty-hint">{variant === 'plus' ? '暂无加豆标签' : '暂无扣豆标签'}</p>
+        <p className="empty-hint">{variant === 'plus' ? t('noPlusYet') : t('noMinusYet')}</p>
       ) : null}
       {list.map((tag) => {
         const missed = isMissedCheckInTag(tag);
@@ -161,21 +165,21 @@ export function TagsPanel() {
               <span className="tag-swatch" style={{ background: tag.color }} />
             )}
             <div className="info">
-              <div className="title">{tag.name}</div>
+              <div className="title">{tagDisplayName(tag, t('missedTagName'))}</div>
               <div className="sub">
                 {missed
                   ? missedLabel(tag.beansOnComplete)
                   : variant === 'minus'
-                    ? `一次 −${tag.beansOnComplete} 小豆`
-                    : `达标 +${tag.beansOnComplete} 小豆`}
+                    ? t('onceMinus', { n: tag.beansOnComplete })
+                    : t('oncePlus', { n: tag.beansOnComplete })}
               </div>
             </div>
             <button type="button" className="btn btn-ghost" onClick={() => openEdit(tag)}>
-              编辑
+              {t('edit')}
             </button>
             {missed ? null : (
               <button type="button" className="btn btn-danger" onClick={() => remove(tag)}>
-                删
+                {t('delete')}
               </button>
             )}
           </div>
@@ -189,18 +193,18 @@ export function TagsPanel() {
       <div className="tag-manage-split">
         <div className="panel">
           <div className="tag-manage-head">
-            <h3>加豆标签</h3>
+            <h3>{t('plusTags')}</h3>
             <button type="button" className="btn btn-primary" onClick={() => openCreate('plus')}>
-              ＋ 新增
+              {t('newBtn')}
             </button>
           </div>
           {renderList(plusTags, 'plus')}
         </div>
         <div className="panel tag-manage-minus">
           <div className="tag-manage-head">
-            <h3>扣豆标签</h3>
+            <h3>{t('minusTags')}</h3>
             <button type="button" className="btn btn-danger" onClick={() => openCreate('minus')}>
-              ＋ 新增
+              {t('newBtn')}
             </button>
           </div>
           {renderList(minusTags, 'minus')}
@@ -211,26 +215,23 @@ export function TagsPanel() {
         <>
           <div className="sheet-backdrop" onClick={closeForm} />
           <div className="sheet" role="dialog" aria-label={formTitle}>
-            <h3>{editingMissed ? '未打卡扣豆' : formTitle}</h3>
-            {error ? <div className="error-banner">{error}</div> : null}
+            <h3>{editingMissed ? t('missedTagName') : formTitle}</h3>
+            {error ? <div className="error-banner">{tr(error)}</div> : null}
             {editingMissed ? (
-              <p className="missed-tag-note">
-                从第一次打卡的第二天起，已经过去却没打卡的日子会自动扣这里的数量。10 小豆 = 1 大豆。填 0
-                则不扣。要扣的比剩下的多时，扣到 0 并进入危险模式。这条不能删除。
-              </p>
+              <p className="missed-tag-note">{t('missedNote')}</p>
             ) : (
               <>
                 <div className="form-row">
-                  <label>名称</label>
+                  <label>{t('nameLabel')}</label>
                   <input
                     ref={nameRef}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder={kind === 'minus' ? '例如：发脾气' : '例如：礼貌交友'}
+                    placeholder={kind === 'minus' ? t('exampleTantrum') : t('examplePolite')}
                   />
                 </div>
                 <div className="form-row">
-                  <label>颜色</label>
+                  <label>{t('colorLabel')}</label>
                   <div className="color-picker">
                     {colors.map((c) => (
                       <button
@@ -247,7 +248,7 @@ export function TagsPanel() {
               </>
             )}
             <div className="form-row">
-              <label>{editingMissed ? '未打卡扣几颗小豆' : kind === 'minus' ? '一次扣豆数' : '达标豆豆数'}</label>
+              <label>{editingMissed ? t('missedAmountLabel') : kind === 'minus' ? t('onceDeduct') : t('beansToEarn')}</label>
               <input
                 type="number"
                 min={0}
@@ -269,10 +270,10 @@ export function TagsPanel() {
             {editingMissed ? <p className="field-hint">{missedLabel(beans)}</p> : null}
             <div className="form-inline">
               <button type="button" className="btn btn-primary" disabled={loading || !name.trim()} onClick={submit}>
-                {editing ? '保存' : '添加'}
+                {editing ? t('save') : t('add')}
               </button>
               <button type="button" className="btn btn-ghost" onClick={closeForm}>
-                取消
+                {t('cancel')}
               </button>
             </div>
           </div>

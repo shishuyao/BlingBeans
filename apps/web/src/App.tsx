@@ -6,9 +6,9 @@ import {
   type AppView,
   type PinModalMode,
   currentMonth,
-  remainingUnlockLabel,
   todayStr,
 } from './appContext';
+import { LanguageSwitch, useI18n } from './i18n';
 import { AuthPage } from './components/AuthPage';
 import { BeanProgressBar } from './components/BeanProgressBar';
 import { BottomNav } from './components/BottomNav';
@@ -40,7 +40,15 @@ export function App() {
   const [pinModal, setPinModal] = useState<PinModalMode | null>(null);
   const [nowTick, setNowTick] = useState(0);
   const [headerCompact, setHeaderCompact] = useState(false);
+  const { t } = useI18n();
   const pinResolver = useRef<((ok: boolean) => void) | null>(null);
+
+  const remain = (until: string | null) => {
+    if (!until) return '';
+    const ms = new Date(until).getTime() - Date.now();
+    if (ms <= 0) return t('unlockExpired');
+    return t('minutes', { m: Math.ceil(ms / 60000) });
+  };
   const mainRef = useRef<HTMLElement>(null);
   const lastScrollY = useRef(0);
 
@@ -341,7 +349,7 @@ export function App() {
   if (booting) {
     return (
       <div className="auth-page">
-        <p className="empty-hint">加载中…</p>
+        <p className="empty-hint">{t('loading')}</p>
       </div>
     );
   }
@@ -355,24 +363,21 @@ export function App() {
           <header className={`top-bar${headerCompact ? ' compact' : ''}`}>
             <div className="top-chrome">
               <div className="brand-row">
-                <div className="brand">果果豆豆</div>
+                <div className="brand">{t('brand')}</div>
                 <div className="brand-actions">
+                  <LanguageSwitch />
                   <button
                     type="button"
                     className={`lock-btn${parentUnlocked && hasPin ? ' unlocked' : ''}`}
                     aria-label={
-                      !hasPin
-                        ? '设置家长 PIN'
-                        : parentUnlocked
-                          ? '锁定家长 PIN'
-                          : '解锁家长 PIN'
+                      !hasPin ? t('pinSetupAria') : parentUnlocked ? t('pinLockAria') : t('pinUnlockAria')
                     }
                     title={
                       !hasPin
-                        ? '未设置家长 PIN'
+                        ? t('pinUnsetTitle')
                         : parentUnlocked
-                          ? `已解锁 · 点击锁定 · 剩余 ${remainingUnlockLabel(unlockUntil)}`
-                          : '已锁定 · 点击解锁'
+                          ? t('pinUnlockedTitle', { time: remain(unlockUntil) })
+                          : t('pinLockedTitle')
                     }
                     onClick={async (e) => {
                       e.preventDefault();
@@ -409,17 +414,15 @@ export function App() {
             <BeanProgressBar />
             <div className="top-chrome">
               {beans?.debtLocked ? (
-                <div className="danger-mode-banner">豆豆锁定 · 欠豆已到 5 颗，先打卡加豆</div>
+                <div className="danger-mode-banner">{t('debtBanner')}</div>
               ) : beans?.dangerLocked ? (
-                <div className="danger-mode-banner">危险模式 · 先打卡攒够豆（当天超过 5 颗即可解锁兑奖）</div>
+                <div className="danger-mode-banner">{t('dangerBanner')}</div>
               ) : null}
               {hasPin && !parentUnlocked ? (
-                <div className="kid-mode-banner">孩子模式 · 打卡/兑奖需家长解锁</div>
+                <div className="kid-mode-banner">{t('kidBanner')}</div>
               ) : null}
               {hasPin && parentUnlocked ? (
-                <div className="parent-mode-banner">
-                  家长已解锁 · 约 {remainingUnlockLabel(unlockUntil)}后自动锁定
-                </div>
+                <div className="parent-mode-banner">{t('parentBanner', { time: remain(unlockUntil) })}</div>
               ) : null}
             </div>
           </header>
